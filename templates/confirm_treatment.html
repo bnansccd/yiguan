@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block page_title %}治疗完成确认 - 挂号#{{ registration.id }} {{ registration.customer.name }}{% endblock %}
+{% block content %}
+<div class="row g-3">
+    <div class="col-md-6">
+        <!-- 治疗摘要 -->
+        <div class="card mb-3"><div class="card-header"><i class="bi bi-clipboard2-check"></i> 治疗摘要</div><div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-6"><strong>客户:</strong> {{ registration.customer.name }}</div>
+                <div class="col-md-6"><strong>理疗师:</strong> {{ registration.employee.name if registration.employee else '-' }}</div>
+                <div class="col-md-6"><strong>就诊类型:</strong> {{ registration.visit_type }}</div>
+                <div class="col-md-6"><strong>挂号时间:</strong> {{ registration.reg_time.strftime('%H:%M') if registration.reg_time else '-' }}</div>
+            </div>
+            {% if record %}
+            <hr>
+            {% if record.chief_complaint %}<p class="mb-1"><strong>主诉:</strong> {{ record.chief_complaint }}</p>{% endif %}
+            {% if record.treatment_plan %}<p class="mb-1"><strong>理疗方案:</strong> {{ record.treatment_plan }}</p>{% endif %}
+            {% set items = record.prescription_items_json|default('[]')|from_json %}
+            {% if items %}
+            <p class="mb-1"><strong>执行项目:</strong></p>
+            <ul class="mb-0">{% for it in items %}<li>{{ it.name }} × {{ it.qty }}</li>{% endfor %}</ul>
+            {% endif %}
+            {% endif %}
+            {% if charge %}
+            <hr>
+            <p class="mb-0"><strong>收费金额:</strong> <span class="text-danger fw-bold">¥{{ '%.2f'|format(charge.final_amount) }}</span>
+                <span class="badge bg-success ms-1">{{ charge.status }}</span></p>
+            {% endif %}
+        </div></div>
+
+        <!-- 服务评价 -->
+        <div class="card"><div class="card-header"><i class="bi bi-star"></i> 服务评价</div><div class="card-body">
+            <form method="POST" enctype="multipart/form-data" id="confirmForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold">满意度评分</label>
+                <div class="star-rating" id="starRating">
+                    <span class="star" data-value="1">★</span>
+                    <span class="star" data-value="2">★</span>
+                    <span class="star" data-value="3">★</span>
+                    <span class="star" data-value="4">★</span>
+                    <span class="star" data-value="5">★</span>
+                </div>
+                <input type="hidden" name="satisfaction_rating" id="ratingInput" value="0">
+                <div class="text-muted small mt-1" id="ratingText">请点击星级评分</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">评价留言（可选）</label>
+                <textarea name="satisfaction_comment" class="form-control form-control-sm" rows="2" placeholder="请留下您的宝贵意见..."></textarea>
+            </div>
+        </div></div>
+    </div>
+
+    <div class="col-md-6">
+        <!-- 客户签字 -->
+        <div class="card"><div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-pen"></i> 客户签字确认</span>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-primary active" id="btnHandwrite" onclick="switchSignMode('handwrite')">手写签字</button>
+                <button type="button" class="btn btn-outline-primary" id="btnUpload" onclick="switchSignMode('upload')">图片上传</button>
+            </div>
+        </div><div class="card-body">
+            <!-- 手写签字板 -->
+            <div id="handwritePanel">
+                <div class="border rounded" style="position:relative;background:#fafafa">
+                    <canvas id="signatureCanvas" width="500" height="200" style="width:100%;height:200px;cursor:crosshair;touch-action:none"></canvas>
+                    <div class="position-absolute" style="top:50%;left:50%;transform:translate(-50%,-50%);color:#ccc;font-size:1.2rem;pointer-events:none" id="sigPlaceholder">请在此处签字</div>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()"><i class="bi bi-eraser"></i> 清除重写</button>
+                    <span class="text-muted small ms-auto">支持鼠标或触屏手写</span>
+                </div>
+            </div>
+
+            <!-- 图片上传 -->
+            <div id="uploadPanel" style="display:none">
+                <div class="mb-2">
+                    <label class="form-label">选择签字图片文件</label>
+                    <input type="file" name="signature_file" class="form-control form-control-sm" accept="image/*" onchange="previewUpload(this)">
+                </div>
+                <div id="uploadPreview" class="border rounded text-center p-3" style="min-height:150px;background:#fafafa">
+                    <p class="text-muted mb-0">选择图片后在此预览</p>
+                </div>
+                <p class="text-muted small mt-1">支持 JPG/PNG 格式，不超过 2MB。可拍照纸质签字后上传。</p>
+            </div>
+
+            <input type="hidden" name="signature_data" id="signatureData">
+
+            <hr>
+            <p class="text-muted small">
+                <i class="bi bi-info-circle"></i> 签字确认后，本次治疗服务流程完成。签字将作为服务完成的电子凭证存档。
+            </p>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{{ url_for('registrations') }}" class="btn btn-secondary btn-sm">跳过签字</a>
+                <button type="submit" class="btn btn-success btn-sm" onclick="return submitConfirm()">
+                    <i class="bi bi-check-circle"></i> 确认完成
+                </button>
+            </div>
+            </form>
+        </div></div>
+    </div>
+</div>
+
+{% block scripts %}
+<style>
+.star-rating { font-size: 2rem; cursor: pointer; user-select: none; }
+.star-rating .star { color: #ddd; transition: color 0.2s; padding: 0 4px; }
+.star-rating .star:hover, .star-rating .star.active { color: #ffc107; }
+.star-rating .star.active { text-shadow: 0 0 4px rgba(255,193,7,0.4); }
+</style>
+<script>
+// ===== 签字板 =====
+const canvas = document.getElementById('signatureCanvas');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+let hasContent = false;
+
+function initCanvas() {
+    // 设置实际像素尺寸（解决高清屏模糊问题）
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+}
+initCanvas();
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+canvas.addEventListener('mousedown', function(e) {
+    drawing = true;
+    hasContent = true;
+    document.getElementById('sigPlaceholder').style.display = 'none';
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+});
+canvas.addEventListener('mousemove', function(e) {
+    if (!drawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+});
+canvas.addEventListener('mouseup', function() { drawing = false; });
+canvas.addEventListener('mouseleave', function() { drawing = false; });
+
+// 触屏支持
+canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    drawing = true;
+    hasContent = true;
+    document.getElementById('sigPlaceholder').style.display = 'none';
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+}, { passive: false });
+canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+}, { passive: false });
+canvas.addEventListener('touchend', function() { drawing = false; });
+
+function clearSignature() {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    hasContent = false;
+    document.getElementById('sigPlaceholder').style.display = '';
+}
+
+// ===== 签字模式切换 =====
+function switchSignMode(mode) {
+    document.getElementById('handwritePanel').style.display = mode === 'handwrite' ? '' : 'none';
+    document.getElementById('uploadPanel').style.display = mode === 'upload' ? '' : 'none';
+    document.getElementById('btnHandwrite').classList.toggle('active', mode === 'handwrite');
+    document.getElementById('btnUpload').classList.toggle('active', mode === 'upload');
+}
+
+// ===== 图片上传预览 =====
+function previewUpload(input) {
+    const preview = document.getElementById('uploadPreview');
+    if (input.files && input.files[0]) {
+        if (input.files[0].size > 2 * 1024 * 1024) {
+            alert('图片大小不能超过2MB');
+            input.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px">';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// ===== 星级评分 =====
+const ratingLabels = ['', '非常不满意', '不满意', '一般', '满意', '非常满意'];
+document.querySelectorAll('.star-rating .star').forEach(star => {
+    star.addEventListener('click', function() {
+        const val = parseInt(this.dataset.value);
+        document.getElementById('ratingInput').value = val;
+        document.querySelectorAll('.star-rating .star').forEach((s, i) => {
+            s.classList.toggle('active', i < val);
+        });
+        document.getElementById('ratingText').textContent = ratingLabels[val] || '';
+    });
+    star.addEventListener('mouseenter', function() {
+        const val = parseInt(this.dataset.value);
+        document.querySelectorAll('.star-rating .star').forEach((s, i) => {
+            s.style.color = i < val ? '#ffc107' : '';
+        });
+    });
+});
+document.getElementById('starRating').addEventListener('mouseleave', function() {
+    const val = parseInt(document.getElementById('ratingInput').value);
+    document.querySelectorAll('.star-rating .star').forEach((s, i) => {
+        s.style.color = '';
+        s.classList.toggle('active', i < val);
+    });
+});
+
+// ===== 提交 =====
+function submitConfirm() {
+    // 收集签字数据
+    const isHandwrite = document.getElementById('handwritePanel').style.display !== 'none';
+    if (isHandwrite && hasContent) {
+        document.getElementById('signatureData').value = canvas.toDataURL('image/png');
+    } else if (isHandwrite && !hasContent) {
+        // 手写模式但没签字 - 允许跳过（不强制）
+        document.getElementById('signatureData').value = '';
+    }
+    // 上传模式不需要signatureData（文件会通过enctype=multipart提交）
+    return true;
+}
+</script>
+{% endblock %}
+{% endblock %}

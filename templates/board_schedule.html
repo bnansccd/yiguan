@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ theme }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排班看板 - {{ store.name if store else '昭德堂健康管理中心' }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ffffff; --bg-secondary: #f8f9fa; --bg-card: #ffffff;
+            --text-primary: #212529; --text-secondary: #6c757d; --border-color: #dee2e6;
+            --accent: #0d6efd; --status-pending: #ffc107; --status-done: #198754;
+            --status-cancel: #dc3545; --status-noshow: #6c757d;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1a1d23; --bg-secondary: #212529; --bg-card: #2d3239;
+            --text-primary: #e9ecef; --text-secondary: #adb5bd; --border-color: #495057;
+            --accent: #3d8bfd; --status-pending: #ffc107; --status-done: #20c997;
+            --status-cancel: #ff6b6b; --status-noshow: #868e96;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Microsoft YaHei', sans-serif; overflow-x: hidden; }
+        .board-header { background: var(--bg-secondary); border-bottom: 2px solid var(--accent); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+        .board-header h4 { margin: 0; font-weight: 700; color: var(--accent); }
+        .clock { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .date-info { font-size: 1.2rem; }
+        .board-toolbar { background: var(--bg-secondary); padding: 8px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-color); }
+        .stats-bar { display: flex; gap: 20px; margin-left: auto; }
+        .stat-item { text-align: center; }
+        .stat-item .num { font-size: 1.5rem; font-weight: 700; }
+        .stat-item .label { font-size: 0.75rem; color: var(--text-secondary); }
+        .stat-pending .num { color: var(--status-pending); }
+        .stat-done .num { color: var(--status-done); }
+        .stat-total .num { color: var(--accent); }
+
+        /* Timeline view */
+        .timeline-container { padding: 16px 24px; overflow-y: auto; height: calc(100vh - 160px); }
+        .timeline-row { display: flex; align-items: stretch; min-height: 60px; border-bottom: 1px solid var(--border-color); padding: 8px 0; }
+        .timeline-time { width: 120px; font-weight: 700; font-size: 1.1rem; padding-top: 4px; color: var(--accent); flex-shrink: 0; }
+        .timeline-card { flex: 1; background: var(--bg-card); border-radius: 8px; padding: 12px 16px; margin: 0 8px; box-shadow: var(--shadow); border-left: 4px solid var(--accent); transition: transform 0.2s; }
+        .timeline-card:hover { transform: translateY(-2px); }
+        .timeline-card.status-待服务 { border-left-color: var(--status-pending); }
+        .timeline-card.status-服务中 { border-left-color: var(--accent); }
+        .timeline-card.status-已完成 { border-left-color: var(--status-done); }
+        .timeline-card.status-已取消 { border-left-color: var(--status-cancel); }
+        .timeline-card.status-未到 { border-left-color: var(--status-noshow); }
+        .card-title { font-weight: 600; margin-bottom: 4px; }
+        .card-meta { font-size: 0.85rem; color: var(--text-secondary); }
+        .status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; }
+
+        /* Matrix view */
+        .matrix-container { padding: 16px 24px; overflow: auto; height: calc(100vh - 160px); }
+        .matrix-table { width: 100%; border-collapse: collapse; }
+        .matrix-table th, .matrix-table td { padding: 10px 12px; border: 1px solid var(--border-color); text-align: center; }
+        .matrix-table th { background: var(--bg-secondary); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+        .matrix-cell { background: var(--bg-card); }
+        .matrix-cell.has-appointment { background: rgba(13,110,253,0.08); cursor: pointer; }
+        [data-theme="dark"] .matrix-cell.has-appointment { background: rgba(61,139,253,0.15); }
+
+        /* List view */
+        .list-container { padding: 16px 24px; overflow-y: auto; height: calc(100vh - 160px); }
+        .list-table { width: 100%; }
+        .list-table th { background: var(--bg-secondary); position: sticky; top: 0; }
+        .list-table td, .list-table th { padding: 10px 14px; }
+        .list-row { transition: background 0.2s; }
+        .list-row:hover { background: var(--bg-secondary); }
+
+        /* Refresh indicator */
+        .refresh-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 3px; background: var(--border-color); z-index: 100; }
+        .refresh-progress { height: 100%; background: var(--accent); transition: width 1s linear; }
+
+        /* Current time indicator */
+        .now-indicator { border-top: 2px dashed var(--status-cancel); position: relative; margin: 4px 0; }
+        .now-indicator::before { content: '现在'; position: absolute; left: -50px; top: -10px; font-size: 0.7rem; color: var(--status-cancel); font-weight: 700; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-secondary); }
+        .empty-state i { font-size: 4rem; margin-bottom: 16px; }
+
+        /* Btn group */
+        .btn-board { border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); }
+        .btn-board:hover, .btn-board.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* Big screen optimization */
+        @media (min-width: 1920px) {
+            .clock { font-size: 3rem; }
+            .timeline-card { padding: 16px 20px; }
+            .stat-item .num { font-size: 2rem; }
+        }
+
+        /* Fullscreen button */
+        .fullscreen-btn { position: fixed; bottom: 16px; right: 16px; z-index: 200; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="board-header">
+        <div>
+            <h4><i class="bi bi-calendar-week"></i> {{ store.name if store else '昭德堂健康管理中心' }} - 排班看板</h4>
+        </div>
+        <div class="text-end">
+            <div class="clock" id="clock">--:--:--</div>
+            <div class="date-info" id="dateInfo">
+                <button class="btn btn-sm btn-board" onclick="changeDate(-1)"><i class="bi bi-chevron-left"></i></button>
+                <span id="dateDisplay">----年--月--日</span>
+                <button class="btn btn-sm btn-board" onclick="changeDate(1)"><i class="bi bi-chevron-right"></i></button>
+                <button class="btn btn-sm btn-board ms-1" onclick="goToday()">今天</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="board-toolbar">
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-board {% if view_mode == 'timeline' %}active{% endif %}" onclick="switchView('timeline')" id="btn-timeline">
+                <i class="bi bi-list-ul"></i> 时间线
+            </button>
+            <button class="btn btn-board {% if view_mode == 'matrix' %}active{% endif %}" onclick="switchView('matrix')" id="btn-matrix">
+                <i class="bi bi-grid-3x3"></i> 理疗师矩阵
+            </button>
+            <button class="btn btn-board {% if view_mode == 'list' %}active{% endif %}" onclick="switchView('list')" id="btn-list">
+                <i class="bi bi-table"></i> 列表
+            </button>
+        </div>
+        <button class="btn btn-sm btn-board" onclick="toggleTheme()" id="themeBtn">
+            <i class="bi bi-moon"></i> 切换主题
+        </button>
+        <span class="text-secondary small" id="refreshInfo">自动刷新: {{ refresh_interval }}秒</span>
+        <div class="stats-bar">
+            <div class="stat-item stat-total"><div class="num" id="statTotal">-</div><div class="label">今日总数</div></div>
+            <div class="stat-item stat-pending"><div class="num" id="statPending">-</div><div class="label">待服务</div></div>
+            <div class="stat-item stat-done"><div class="num" id="statDone">-</div><div class="label">已完成</div></div>
+            <div class="stat-item"><div class="num" id="statWeek">-</div><div class="label">本周合计</div></div>
+        </div>
+    </div>
+
+    <!-- Content Area -->
+    <div id="boardContent" class="timeline-container">
+        <div class="empty-state"><i class="bi bi-hourglass-split"></i><p>加载中...</p></div>
+    </div>
+
+    <!-- Refresh progress bar -->
+    <div class="refresh-bar"><div class="refresh-progress" id="refreshProgress" style="width:0%"></div></div>
+
+    <!-- Fullscreen button -->
+    <button class="btn btn-primary rounded-circle fullscreen-btn" onclick="toggleFullscreen()" title="全屏模式">
+        <i class="bi bi-arrows-fullscreen"></i>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // ===== Configuration =====
+    const TOKEN = '{{ token }}';
+    const REFRESH_INTERVAL = {{ refresh_interval }};
+    let currentView = '{{ view_mode }}';
+    let currentDate = new Date().toISOString().slice(0, 10);
+    let refreshTimer = null;
+    let progressTimer = null;
+    let boardData = null;
+
+    // ===== Clock =====
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent = now.toLocaleTimeString('zh-CN', {hour12: false});
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ===== Date Navigation =====
+    function changeDate(delta) {
+        const d = new Date(currentDate);
+        d.setDate(d.getDate() + delta);
+        currentDate = d.toISOString().slice(0, 10);
+        loadData();
+    }
+    function goToday() {
+        currentDate = new Date().toISOString().slice(0, 10);
+        loadData();
+    }
+    function updateDateDisplay() {
+        const d = new Date(currentDate);
+        const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+        document.getElementById('dateDisplay').textContent =
+            `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+    }
+
+    // ===== Data Loading =====
+    async function loadData() {
+        updateDateDisplay();
+        try {
+            const resp = await fetch(`/api/board/schedule?token=${TOKEN}&date=${currentDate}`);
+            if (!resp.ok) throw new Error('加载失败');
+            boardData = await resp.json();
+            renderBoard();
+            updateStats();
+        } catch(e) {
+            document.getElementById('boardContent').innerHTML =
+                `<div class="empty-state"><i class="bi bi-exclamation-triangle text-warning"></i><p>数据加载失败，请检查网络连接</p></div>`;
+        }
+    }
+
+    function updateStats() {
+        if (!boardData) return;
+        const s = boardData.stats;
+        document.getElementById('statTotal').textContent = s.today_total;
+        document.getElementById('statPending').textContent = s.today_pending;
+        document.getElementById('statDone').textContent = s.today_done;
+        document.getElementById('statWeek').textContent = s.week_total;
+    }
+
+    // ===== Status Helpers =====
+    function statusBadge(status) {
+        const map = {
+            '待服务': 'bg-warning text-dark', '服务中': 'bg-primary',
+            '已完成': 'bg-success', '已取消': 'bg-danger', '未到': 'bg-secondary'
+        };
+        return `<span class="status-badge ${map[status] || 'bg-secondary'}">${status}</span>`;
+    }
+    function isCurrentTime(start, end) {
+        const now = new Date();
+        const cur = now.getHours() * 60 + now.getMinutes();
+        const [sh, sm] = start.split(':').map(Number);
+        const [eh, em] = end.split(':').map(Number);
+        return cur >= sh * 60 + sm && cur <= eh * 60 + em;
+    }
+
+    // ===== Render Views =====
+    function renderBoard() {
+        if (!boardData) return;
+        const appts = boardData.appointments;
+        const container = document.getElementById('boardContent');
+
+        if (currentView === 'timeline') renderTimeline(container, appts);
+        else if (currentView === 'matrix') renderMatrix(container, appts);
+        else renderList(container, appts);
+    }
+
+    function renderTimeline(container, appts) {
+        container.className = 'timeline-container';
+        if (!appts.length) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p>当日暂无预约排班</p></div>';
+            return;
+        }
+        let html = '';
+        let lastTime = '';
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        let nowInserted = false;
+
+        appts.forEach(a => {
+            const [sh, sm] = a.start_time.split(':').map(Number);
+            const slotMin = sh * 60 + sm;
+            // Insert "now" indicator
+            if (!nowInserted && nowMin < slotMin) {
+                html += `<div class="now-indicator"></div>`;
+                nowInserted = true;
+            }
+            const timeStr = `${a.start_time} - ${a.end_time}`;
+            const isNow = isCurrentTime(a.start_time, a.end_time);
+            html += `<div class="timeline-row">
+                <div class="timeline-time">${timeStr}</div>
+                <div class="timeline-card status-${a.status} ${isNow ? 'border-2 border-danger' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="card-title">${a.customer_name} ${isNow ? '<span class="badge bg-danger animate__animated animate__pulse">服务中</span>' : ''}</div>
+                        ${statusBadge(a.status)}
+                    </div>
+                    <div class="card-meta">
+                        <i class="bi bi-person-badge"></i> ${a.employee_name}
+                        ${a.service_item ? ' &nbsp;<i class="bi bi-scissors"></i> ' + a.service_item : ''}
+                        ${a.note ? ' &nbsp;<i class="bi bi-chat-text"></i> ' + a.note : ''}
+                    </div>
+                </div>
+            </div>`;
+        });
+        if (!nowInserted) {
+            html += `<div class="now-indicator"></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function renderMatrix(container, appts) {
+        container.className = 'matrix-container';
+        if (!appts.length) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p>当日暂无预约排班</p></div>';
+            return;
+        }
+        // Group by employee
+        const emps = {};
+        const times = new Set();
+        appts.forEach(a => {
+            if (!emps[a.employee_name]) emps[a.employee_name] = [];
+            emps[a.employee_name].push(a);
+            times.add(a.start_time);
+        });
+        const sortedTimes = [...times].sort();
+        const empNames = Object.keys(emps).sort();
+
+        let html = '<table class="matrix-table"><thead><tr><th>理疗师</th>';
+        sortedTimes.forEach(t => { html += `<th>${t}</th>`; });
+        html += '</tr></thead><tbody>';
+        empNames.forEach(name => {
+            html += `<tr><td class="fw-bold">${name}</td>`;
+            sortedTimes.forEach(t => {
+                const match = emps[name].find(a => a.start_time === t);
+                if (match) {
+                    html += `<td class="matrix-cell has-appointment">
+                        <div class="small fw-bold">${match.customer_name}</div>
+                        <div class="small text-secondary">${match.service_item || ''}</div>
+                        ${statusBadge(match.status)}
+                    </td>`;
+                } else {
+                    html += '<td class="matrix-cell text-secondary">-</td>';
+                }
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function renderList(container, appts) {
+        container.className = 'list-container';
+        if (!appts.length) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p>当日暂无预约排班</p></div>';
+            return;
+        }
+        let html = `<table class="list-table table">
+            <thead><tr><th>时间</th><th>客户</th><th>理疗师</th><th>项目</th><th>状态</th><th>备注</th></tr></thead><tbody>`;
+        appts.forEach(a => {
+            const isNow = isCurrentTime(a.start_time, a.end_time);
+            html += `<tr class="list-row ${isNow ? 'table-warning' : ''}">
+                <td class="fw-bold">${a.start_time} - ${a.end_time}</td>
+                <td>${a.customer_name}</td>
+                <td>${a.employee_name}</td>
+                <td>${a.service_item || '-'}</td>
+                <td>${statusBadge(a.status)}</td>
+                <td class="text-secondary small">${a.note || '-'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    // ===== View Switch =====
+    function switchView(view) {
+        currentView = view;
+        document.querySelectorAll('.btn-board').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + view).classList.add('active');
+        renderBoard();
+    }
+
+    // ===== Theme Toggle =====
+    function toggleTheme() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        const icon = document.querySelector('#themeBtn i');
+        icon.className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+    }
+
+    // ===== Fullscreen =====
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(()=>{});
+        } else {
+            document.exitFullscreen().catch(()=>{});
+        }
+    }
+
+    // ===== Auto Refresh =====
+    function startRefresh() {
+        let elapsed = 0;
+        const total = REFRESH_INTERVAL;
+        const bar = document.getElementById('refreshProgress');
+
+        if (progressTimer) clearInterval(progressTimer);
+        if (refreshTimer) clearTimeout(refreshTimer);
+
+        progressTimer = setInterval(() => {
+            elapsed++;
+            const pct = Math.min((elapsed / total) * 100, 100);
+            bar.style.width = pct + '%';
+        }, 1000);
+
+        refreshTimer = setTimeout(() => {
+            clearInterval(progressTimer);
+            bar.style.width = '0%';
+            elapsed = 0;
+            loadData();
+            startRefresh();
+        }, total * 1000);
+    }
+
+    // ===== Init =====
+    loadData();
+    startRefresh();
+    </script>
+</body>
+</html>

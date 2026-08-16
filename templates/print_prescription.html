@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>处方单 - 挂号#{{ registration.id }}</title>
+    <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/print.css" rel="stylesheet">
+</head>
+<body>
+    <div class="print-toolbar no-print">
+        <h6 class="mb-3"><i class="bi bi-printer"></i> 处方单打印预览</h6>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> 立即打印
+        </button>
+        <a href="/registration/{{ registration.id }}/medical" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> 返回病历
+        </a>
+        <p class="text-muted small mt-2">将调用本机默认打印机（支持58mm/80mm热敏小票打印机）</p>
+    </div>
+
+    <div class="print-area">
+        <!-- 头部 -->
+        <div class="receipt-header">
+            <h5>{{ store.name if store else '昭德堂健康管理中心' }}</h5>
+            <div class="store-info">
+                {% if store %}{{ store.address }}<br>{{ store.phone }}{% endif %}
+            </div>
+            <div style="font-size:14px;font-weight:700;margin-top:6px">— 处 方 单 —</div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="receipt-body">
+            <div class="receipt-row">
+                <span class="label">挂号编号:</span>
+                <span class="value">#{{ registration.id }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">客户姓名:</span>
+                <span class="value">{{ registration.customer.name }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">就诊类型:</span>
+                <span class="value">{{ registration.visit_type }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">开方时间:</span>
+                <span class="value">{{ record.created_at.strftime('%Y-%m-%d %H:%M') if record and record.created_at else '-' }}</span>
+            </div>
+
+            {% if record %}
+            <div class="receipt-divider"></div>
+
+            <!-- 诊断信息 -->
+            {% if record.chief_complaint %}
+            <div style="font-size:11px;margin-bottom:4px"><strong>主诉:</strong> {{ record.chief_complaint[:60] }}</div>
+            {% endif %}
+            {% if record.syndrome %}
+            <div style="font-size:11px;margin-bottom:4px"><strong>辨证分型:</strong> {{ record.syndrome }}</div>
+            {% endif %}
+            {% if record.treatment_plan %}
+            <div style="font-size:11px;margin-bottom:4px"><strong>理疗方案:</strong> {{ record.treatment_plan[:60] }}</div>
+            {% endif %}
+
+            <div class="receipt-divider"></div>
+
+            <!-- 理疗项目 -->
+            {% set items = record.prescription_items_json|default('[]')|from_json %}
+            {% if items %}
+            <div style="font-weight:700;font-size:12px;margin-bottom:4px">【理疗项目】</div>
+            <table class="receipt-table">
+                <thead><tr><th>项目</th><th class="text-right">数量</th><th class="text-right">金额</th></tr></thead>
+                <tbody>
+                {% for it in items %}
+                <tr><td>{{ it.name }}</td><td class="text-right">{{ it.qty }}</td><td class="text-right">¥{{ it.subtotal }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <!-- 药品 -->
+            {% set meds = record.prescription_meds_json|default('[]')|from_json %}
+            {% if meds %}
+            <div class="receipt-divider"></div>
+            <div style="font-weight:700;font-size:12px;margin-bottom:4px">【药品明细】</div>
+            <table class="receipt-table">
+                <thead><tr><th>药品</th><th class="text-right">数量</th><th class="text-right">金额</th></tr></thead>
+                <tbody>
+                {% for m in meds %}
+                <tr><td>{{ m.name }}</td><td class="text-right">{{ m.qty }}{{ m.unit or '' }}</td><td class="text-right">¥{{ m.subtotal }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- 底部 -->
+        <div class="receipt-footer">
+            <div>※ 请遵医嘱，如有不适请及时就诊 ※</div>
+            <div style="margin-top:4px">{{ store.name if store else '昭德堂健康管理中心' }}</div>
+        </div>
+    </div>
+
+    <script>
+    // 自动打印
+    window.addEventListener('load', function() {
+        // 延迟0.5秒自动弹出打印对话框
+        setTimeout(function() { window.print(); }, 500);
+    });
+    </script>
+</body>
+</html>

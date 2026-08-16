@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block page_title %}年卡管理{% endblock %}
+{% block content %}
+<!-- 搜索与筛选 -->
+<div class="d-flex justify-content-between mb-3">
+    <form class="d-flex gap-2" method="GET">
+        <input type="text" name="keyword" class="form-control form-control-sm" placeholder="搜索客户姓名/手机" value="{{ keyword }}" style="width:200px">
+        <select name="status" class="form-select form-select-sm" style="width:120px">
+            <option value="">全部状态</option>
+            {% for s in ['正常','已冻结','已过期'] %}
+            <option value="{{ s }}" {{ 'selected' if status_filter == s else '' }}>{{ s }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-sm btn-outline-primary">搜索</button>
+    </form>
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#purchaseModal">
+        <i class="bi bi-plus-circle"></i> 开通年卡
+    </button>
+</div>
+
+<!-- 年卡列表 -->
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover table-sm mb-0">
+    <thead><tr>
+        <th>ID</th><th>客户</th><th>年卡类型</th><th>购买日期</th><th>到期日期</th>
+        <th>购买价格</th><th>剩余次数</th><th>状态</th><th>操作</th>
+    </tr></thead>
+    <tbody>
+    {% for card in cards %}
+    <tr class="{{ 'table-warning' if card.status == '已冻结' else ('table-secondary' if card.status == '已过期' else '') }}">
+        <td>{{ card.id }}</td>
+        <td><a href="{{ url_for('customer_detail', cid=card.customer_id) }}">{{ card.customer.name }}</a></td>
+        <td>{{ card.template.name if card.template else '-' }}</td>
+        <td>{{ card.purchase_date }}</td>
+        <td>{{ card.expire_date }}</td>
+        <td>¥{{ card.purchase_price or 0 }}</td>
+        <td>
+            {% set remaining = card.remaining_times_json | parse_json %}
+            {% if remaining %}
+                {% for sid, cnt in remaining.items() %}
+                    <span class="badge bg-info me-1">{{ cnt }}次</span>
+                {% endfor %}
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
+        </td>
+        <td>
+            {% set colors = {'正常':'success','已冻结':'warning','已过期':'secondary'} %}
+            <span class="badge bg-{{ colors.get(card.status, 'light') }}">{{ card.status }}</span>
+        </td>
+        <td>
+            <a href="{{ url_for('annual_card_usage', card_id=card.id) }}" class="btn btn-sm btn-outline-info py-0">使用记录</a>
+            {% if card.status in ['正常','已冻结'] %}
+            <form method="POST" action="{{ url_for('annual_card_freeze', card_id=card.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-{{ 'success' if card.status == '已冻结' else 'warning' }} py-0">
+                    {{ '解冻' if card.status == '已冻结' else '冻结' }}</button>
+            </form>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal"
+                    data-bs-target="#renewModal{{ card.id }}">续费</button>
+
+            <!-- 续费弹窗 -->
+            <div class="modal fade" id="renewModal{{ card.id }}" tabindex="-1">
+                <div class="modal-dialog"><div class="modal-content">
+                    <div class="modal-header"><h5 class="modal-title">续费年卡 - {{ card.customer.name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <form method="POST" action="{{ url_for('annual_card_renew', card_id=card.id) }}">
+                    <div class="modal-body">
+                        <p>年卡类型: <strong>{{ card.template.name if card.template else '-' }}</strong></p>
+                        <p>当前到期日: {{ card.expire_date }}</p>
+                        <p>续费后将延长 {{ card.template.valid_days if card.template else 365 }} 天，并重置各项目次数。</p>
+                        <div class="mb-3">
+                            <label class="form-label">续费价格</label>
+                            <input type="number" name="renew_price" class="form-control" step="0.01"
+                                   value="{{ card.template.price if card.template else 0 }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-success btn-sm">确认续费</button>
+                    </div>
+                    </form>
+                </div></div>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not cards %}
+    <tr><td colspan="9" class="text-center text-muted py-3">暂无年卡记录</td></tr>
+    {% endif %}
+    </tbody>
+</table>
+</div></div></div>
+
+<!-- 开通年卡弹窗 -->
+<div class="modal fade" id="purchaseModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">开通年卡</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST" action="{{ url_for('annual_card_purchase') }}">
+        <div class="modal-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">客户 *</label>
+                    <select name="customer_id" class="form-select form-select-sm" required>
+                        <option value="">请选择客户</option>
+                        {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.name }} ({{ c.phone or '-' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">年卡模板 *</label>
+                    <select name="template_id" class="form-select form-select-sm" required id="selTemplate"
+                            onchange="updateTemplateInfo()">
+                        <option value="">请选择模板</option>
+                        {% for t in templates %}
+                        <option value="{{ t.id }}" data-price="{{ t.price }}"
+                                data-days="{{ t.valid_days }}"
+                                data-services="{{ t.services_json or '[]' }}">
+                            {{ t.name }} (¥{{ t.price }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">实际售价</label>
+                    <input type="number" name="purchase_price" class="form-control form-control-sm"
+                           id="purchasePrice" step="0.01" value="0">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">备注</label>
+                    <input type="text" name="remark" class="form-control form-control-sm">
+                </div>
+                <div class="col-12">
+                    <div id="templateInfo" class="alert alert-light py-2 mb-0" style="display:none">
+                        <strong>包含项目：</strong>
+                        <div id="templateServices"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-success btn-sm">确认开通</button>
+        </div>
+        </form>
+    </div></div>
+</div>
+
+<script>
+function updateTemplateInfo() {
+    const sel = document.getElementById('selTemplate');
+    const opt = sel.options[sel.selectedIndex];
+    const infoDiv = document.getElementById('templateInfo');
+    const svcDiv = document.getElementById('templateServices');
+    const priceInput = document.getElementById('purchasePrice');
+
+    if (!opt.value) { infoDiv.style.display = 'none'; return; }
+
+    priceInput.value = opt.dataset.price;
+    const services = JSON.parse(opt.dataset.services || '[]');
+    let html = '<ul class="mb-0">';
+    services.forEach(s => {
+        html += `<li>${s.name}: ${s.total_times}次</li>`;
+    });
+    html += '</ul>';
+    svcDiv.innerHTML = html;
+    infoDiv.style.display = 'block';
+}
+</script>
+{% endblock %}

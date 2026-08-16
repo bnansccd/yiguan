@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block page_title %}年卡使用记录 - {{ card.customer.name }} / {{ card.template.name if card.template else '-' }}{% endblock %}
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('annual_cards') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回年卡列表
+    </a>
+</div>
+
+<!-- 年卡概要 -->
+<div class="card mb-3"><div class="card-body">
+    <div class="row">
+        <div class="col-md-3">
+            <strong>客户：</strong>
+            <a href="{{ url_for('customer_detail', cid=card.customer_id) }}">{{ card.customer.name }}</a>
+        </div>
+        <div class="col-md-3"><strong>年卡类型：</strong>{{ card.template.name if card.template else '-' }}</div>
+        <div class="col-md-3"><strong>购买日期：</strong>{{ card.purchase_date }}</div>
+        <div class="col-md-3"><strong>到期日期：</strong>{{ card.expire_date }}</div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-md-3"><strong>购买价格：</strong>¥{{ card.purchase_price or 0 }}</div>
+        <div class="col-md-3">
+            <strong>状态：</strong>
+            {% set colors = {'正常':'success','已冻结':'warning','已过期':'secondary'} %}
+            <span class="badge bg-{{ colors.get(card.status, 'light') }}">{{ card.status }}</span>
+        </div>
+        <div class="col-md-6">
+            <strong>剩余次数：</strong>
+            {% set remaining = card.remaining_times_json | parse_json %}
+            {% if remaining %}
+                {% for sid, cnt in remaining.items() %}
+                    <span class="badge bg-info me-1">{{ cnt }}次</span>
+                {% endfor %}
+            {% else %}
+                <span class="text-muted">无</span>
+            {% endif %}
+        </div>
+    </div>
+</div></div>
+
+<!-- 使用记录列表 -->
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover table-sm mb-0">
+    <thead><tr>
+        <th>记录ID</th><th>使用日期</th><th>服务项目</th><th>本次核销次数</th>
+        <th>核销后剩余</th><th>关联收费单</th><th>操作人</th>
+    </tr></thead>
+    <tbody>
+    {% for u in usages %}
+    <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '-' }}</td>
+        <td>{{ u.service_item.name if u.service_item else '-' }}</td>
+        <td><span class="badge bg-warning">{{ u.used_times }}次</span></td>
+        <td>{{ u.remaining_after }}次</td>
+        <td>
+            {% if u.charge_id %}
+            <a href="{{ url_for('charges') }}?id={{ u.charge_id }}">#{{ u.charge_id }}</a>
+            {% else %}
+            -
+            {% endif %}
+        </td>
+        <td>{{ u.operator.display_name if u.operator else '-' }}</td>
+    </tr>
+    {% endfor %}
+    {% if not usages %}
+    <tr><td colspan="7" class="text-center text-muted py-3">暂无使用记录</td></tr>
+    {% endif %}
+    </tbody>
+</table>
+</div></div></div>
+{% endblock %}

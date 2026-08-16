@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block page_title %}入库单列表{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 返回库存</a>
+    <a href="{{ url_for('batch_inbound') }}" class="btn btn-sm btn-success"><i class="bi bi-plus-circle"></i> 新建批量入库</a>
+</div>
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>入库单号</th><th>供应商</th><th>明细项</th><th>总金额</th><th>状态</th><th>操作员</th><th>入库时间</th><th>备注</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+    <tr class="{{ 'table-secondary' if o.status == '已取消' else '' }}">
+        <td><strong>{{ o.order_no }}</strong></td>
+        <td>{{ o.supplier or '-' }}</td>
+        <td>{{ o.items|length }}项</td>
+        <td class="fw-bold">¥{{ "%.2f"|format(o.total_amount) }}</td>
+        <td><span class="badge bg-{{ {'已入库':'success','待确认':'warning','已取消':'secondary'}[o.status] or 'light' }}">{{ o.status }}</span></td>
+        <td>{{ o.operator.display_name if o.operator else '-' }}</td>
+        <td><small>{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '-' }}</small></td>
+        <td><small>{{ o.remark or '-' }}</small></td>
+        <td>
+            <button class="btn btn-sm btn-outline-info py-0" data-bs-toggle="modal" data-bs-target="#detail{{ o.id }}">明细</button>
+            {% if o.status == '待确认' %}
+            <button class="btn btn-sm btn-outline-warning py-0" data-bs-toggle="modal" data-bs-target="#edit{{ o.id }}">编辑</button>
+            <form method="POST" action="{{ url_for('inbound_order_cancel', oid=o.id) }}" class="d-inline" onsubmit="return confirm('确定取消该入库单？')">
+                <button class="btn btn-sm btn-outline-danger py-0">取消</button></form>
+            {% endif %}
+        </td>
+    </tr>
+    <!-- 明细弹窗 -->
+    <div class="modal fade" id="detail{{ o.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">入库单明细 - {{ o.order_no }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <p><strong>供应商:</strong> {{ o.supplier or '-' }} | <strong>状态:</strong> {{ o.status }} | <strong>总金额:</strong> ¥{{ "%.2f"|format(o.total_amount) }}</p>
+            <table class="table table-sm"><thead><tr><th>药品/耗材</th><th>数量</th><th>采购单价</th><th>小计</th><th>批次号</th><th>生产日期</th><th>有效期</th></tr></thead><tbody>
+            {% for it in o.items %}
+            <tr><td>{{ it.medicine.name }}</td><td>{{ it.quantity }}</td><td>¥{{ "%.2f"|format(it.unit_price) }}</td>
+                <td>¥{{ "%.2f"|format(it.unit_price * it.quantity) }}</td>
+                <td>{{ it.batch_no or '-' }}</td><td>{{ it.production_date or '-' }}</td><td>{{ it.expiry_date or '-' }}</td></tr>
+            {% endfor %}
+            </tbody></table>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>
+    </div></div></div>
+    <!-- 编辑弹窗 -->
+    {% if o.status == '待确认' %}
+    <div class="modal fade" id="edit{{ o.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑入库单 - {{ o.order_no }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST" action="{{ url_for('inbound_order_edit', oid=o.id) }}">
+        <div class="modal-body"><div class="row g-3">
+            <div class="col-12"><label class="form-label">供应商</label><input type="text" name="supplier" class="form-control form-control-sm" value="{{ o.supplier or '' }}"></div>
+            <div class="col-12"><label class="form-label">备注</label><input type="text" name="remark" class="form-control form-control-sm" value="{{ o.remark or '' }}"></div>
+        </div></div>
+        <div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+    </div></div></div>
+    {% endif %}
+    {% endfor %}
+    {% if not orders %}<tr><td colspan="9" class="text-center text-muted py-3">暂无入库单</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+{% endblock %}

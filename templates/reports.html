@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block page_title %}经营报表{% endblock %}
+{% block content %}
+<form class="d-flex gap-2 mb-3 flex-wrap" method="GET">
+    <input type="date" name="start" class="form-control form-control-sm" value="{{ start }}" style="width:150px">
+    <span class="align-self-center">至</span>
+    <input type="date" name="end" class="form-control form-control-sm" value="{{ end }}" style="width:150px">
+    <button class="btn btn-sm btn-outline-primary">查询</button>
+    <a href="{{ url_for('reports_export', start=start, end=end) }}" class="btn btn-sm btn-outline-success">导出CSV</a>
+    {% if current_user.role == '管理员' %}
+    <form method="POST" action="{{ url_for('generate_daily_report') }}" class="d-inline">
+        <input type="hidden" name="date" value="{{ end }}">
+        <button class="btn btn-sm btn-outline-info">生成日报</button>
+    </form>
+    {% endif %}
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-2"><div class="stat-card bg-success-subtle"><div class="stat-icon"><i class="bi bi-currency-yen"></i></div><div><div class="stat-value">{{ "%.2f"|format(total_revenue) }}</div><div class="stat-label">营业收入(元)</div></div></div></div>
+    <div class="col-md-2"><div class="stat-card bg-info-subtle"><div class="stat-icon"><i class="bi bi-receipt"></i></div><div><div class="stat-value">{{ charge_count }}</div><div class="stat-label">收费笔数</div></div></div></div>
+    <div class="col-md-2"><div class="stat-card bg-primary-subtle"><div class="stat-icon"><i class="bi bi-wallet2"></i></div><div><div class="stat-value">{{ "%.2f"|format(total_recharge) }}</div><div class="stat-label">充值收入(元)</div></div></div></div>
+    <div class="col-md-2"><div class="stat-card bg-warning-subtle"><div class="stat-icon"><i class="bi bi-gift"></i></div><div><div class="stat-value">{{ "%.2f"|format(total_gift) }}</div><div class="stat-label">赠送金额(元)</div></div></div></div>
+    <div class="col-md-2"><div class="stat-card bg-danger-subtle"><div class="stat-icon"><i class="bi bi-bag-x"></i></div><div><div class="stat-value">{{ "%.2f"|format(total_cost) }}</div><div class="stat-label">成本支出(元)</div></div></div></div>
+    <div class="col-md-2"><div class="stat-card {{ 'bg-success' if total_profit >= 0 else 'bg-danger' }}" style="color:white">
+        <div class="stat-icon" style="color:rgba(255,255,255,0.7)"><i class="bi bi-graph-up-arrow"></i></div>
+        <div><div class="stat-value">{{ "%.2f"|format(total_profit) }}</div><div class="stat-label">利润 ({{ "%.1f"|format(profit_rate) }}%)</div></div>
+    </div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card"><div class="card-header">项目热度排行</div><div class="card-body p-0">
+        <table class="table table-sm mb-0"><thead><tr><th>项目</th><th>次数</th><th>收入</th><th>成本</th><th>利润</th></tr></thead><tbody>
+        {% for name, stat in item_stats.items()|sort(attribute='1.revenue', reverse=true) %}
+        <tr><td>{{ name }}</td><td>{{ stat.count }}</td><td>¥{{ "%.2f"|format(stat.revenue) }}</td><td>¥{{ "%.2f"|format(stat.cost) }}</td><td class="{{ 'text-success' if stat.revenue - stat.cost >= 0 else 'text-danger' }}">¥{{ "%.2f"|format(stat.revenue - stat.cost) }}</td></tr>
+        {% endfor %}
+        {% if not item_stats %}<tr><td colspan="5" class="text-center text-muted py-3">暂无数据</td></tr>{% endif %}
+        </tbody></table></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-header">员工业绩</div><div class="card-body p-0">
+        <table class="table table-sm mb-0"><thead><tr><th>员工</th><th>笔数</th><th>收入</th></tr></thead><tbody>
+        {% for name, stat in emp_stats.items()|sort(attribute='1.revenue', reverse=true) %}
+        <tr><td>{{ name }}</td><td>{{ stat.count }}</td><td>¥{{ "%.2f"|format(stat.revenue) }}</td></tr>
+        {% endfor %}
+        {% if not emp_stats %}<tr><td colspan="3" class="text-center text-muted py-3">暂无数据</td></tr>{% endif %}
+        </tbody></table></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-header">客户消费排行 Top20</div><div class="card-body p-0">
+        <table class="table table-sm mb-0"><thead><tr><th>#</th><th>客户</th><th>次数</th><th>金额</th></tr></thead><tbody>
+        {% for name, stat in cust_rank %}
+        <tr><td>{{ loop.index }}</td><td>{{ name }}</td><td>{{ stat.count }}</td><td>¥{{ "%.2f"|format(stat.revenue) }}</td></tr>
+        {% endfor %}
+        {% if not cust_rank %}<tr><td colspan="4" class="text-center text-muted py-3">暂无数据</td></tr>{% endif %}
+        </tbody></table></div></div>
+    </div>
+</div>
+{% endblock %}

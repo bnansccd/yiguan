@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block page_title %}库存管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('inventory_flows') }}" class="btn btn-sm btn-outline-info">出入库流水</a>
+        <a href="{{ url_for('inventory_alerts') }}" class="btn btn-sm btn-outline-warning">库存预警</a>
+        <a href="{{ url_for('inventory_stocktake') }}" class="btn btn-sm btn-outline-primary">库存盘点</a>
+        <a href="{{ url_for('inbound_orders') }}" class="btn btn-sm btn-outline-secondary">入库单</a>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('batch_inbound') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-list-ol"></i> 批量入库</a>
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#inboundModal"><i class="bi bi-box-arrow-in-down"></i> 单品入库</button>
+    </div>
+</div>
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>药品/耗材</th><th>分类</th><th>规格</th><th>单位</th><th>零售价</th><th>当前库存</th><th>预警值</th><th>状态</th></tr></thead>
+    <tbody>
+    {% for row in inventory %}
+    <tr class="{{ 'table-danger' if row.stock <= row.medicine.alert_threshold else '' }}">
+        <td>{{ row.medicine.name }}</td>
+        <td>{{ row.medicine.category or '-' }}</td>
+        <td>{{ row.medicine.spec or '-' }}</td>
+        <td>{{ row.medicine.unit or '-' }}</td>
+        <td>¥{{ row.medicine.retail_price }}</td>
+        <td class="fw-bold">{{ row.stock }}</td>
+        <td>{{ row.medicine.alert_threshold }}</td>
+        <td>{% if row.stock <= row.medicine.alert_threshold %}<span class="badge bg-danger">低库存</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table></div></div></div>
+
+<!-- 入库弹窗 -->
+<div class="modal fade" id="inboundModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">药品入库</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('inventory_inbound') }}">
+    <div class="modal-body"><div class="row g-3">
+        <div class="col-12"><label class="form-label">药品 *</label><select name="medicine_id" class="form-select form-select-sm" required>
+            {% for row in inventory %}<option value="{{ row.medicine.id }}">{{ row.medicine.name }} (库存:{{ row.stock }})</option>{% endfor %}
+        </select></div>
+        <div class="col-md-6"><label class="form-label">入库数量 *</label><input type="number" name="quantity" class="form-control form-control-sm" required min="1"></div>
+        <div class="col-md-6"><label class="form-label">采购单价</label><input type="number" name="unit_price" class="form-control form-control-sm" step="0.01"></div>
+        <div class="col-md-6"><label class="form-label">批次号</label><input type="text" name="batch_no" class="form-control form-control-sm"></div>
+        <div class="col-md-6"><label class="form-label">供应商</label><input type="text" name="supplier" class="form-control form-control-sm"></div>
+        <div class="col-md-6"><label class="form-label">生产日期</label><input type="date" name="production_date" class="form-control form-control-sm"></div>
+        <div class="col-md-6"><label class="form-label">有效期</label><input type="date" name="expiry_date" class="form-control form-control-sm"></div>
+    </div></div>
+    <div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">确认入库</button></div>
+    </form>
+</div></div></div>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block page_title %}预充值管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <form class="d-flex gap-2" method="GET">
+        <input type="text" name="keyword" class="form-control form-control-sm" placeholder="搜索客户" value="{{ keyword }}" style="width:200px">
+        <button class="btn btn-sm btn-outline-primary">搜索</button>
+    </form>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#rechargeModal"><i class="bi bi-plus-circle"></i> 充值</button>
+        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#refundModal"><i class="bi bi-arrow-return-left"></i> 退款</button>
+    </div>
+</div>
+
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>客户</th><th>电话</th><th>会员等级</th><th>当前余额</th><th>累计充值</th><th>累计消费</th><th>累计赠送</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for c, a in rows %}
+    <tr>
+        <td><a href="{{ url_for('customer_detail', cid=c.id) }}">{{ c.name }}</a></td>
+        <td>{{ c.phone or '-' }}</td>
+        <td>{{ c.member_level }}</td>
+        <td class="fw-bold text-success">¥{{ "%.2f"|format(a.balance) }}</td>
+        <td>¥{{ "%.2f"|format(a.total_recharge) }}</td>
+        <td>¥{{ "%.2f"|format(a.total_consumed) }}</td>
+        <td>¥{{ "%.2f"|format(a.total_gift) }}</td>
+        <td>
+            <button class="btn btn-sm btn-outline-success py-0" onclick="setCustomer({{ c.id }},'{{ c.name }}','recharge')">充值</button>
+            <button class="btn btn-sm btn-outline-warning py-0" onclick="setCustomer({{ c.id }},'{{ c.name }}','refund')">退款</button>
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not rows %}<tr><td colspan="8" class="text-center text-muted py-3">暂无数据</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+<!-- 充值弹窗 -->
+<div class="modal fade" id="rechargeModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">客户充值</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('prepaid_recharge') }}">
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-12"><label class="form-label">客户 *</label>
+                <select name="customer_id" id="r_customer" class="form-select form-select-sm" required>
+                    <option value="">请选择</option>
+                    {% for c, a in rows %}<option value="{{ c.id }}">{{ c.name }} (余额:¥{{ "%.2f"|format(a.balance) }})</option>{% endfor %}
+                </select></div>
+            <div class="col-12"><label class="form-label">快捷套餐</label>
+                <div class="d-flex gap-2 flex-wrap">
+                {% for pkg in packages %}
+                <button type="button" class="btn btn-sm btn-outline-primary pkg-btn" data-amount="{{ pkg }}" data-gift="{{ gift_map.get(pkg, 0) }}">
+                    ¥{{ pkg }}{% if gift_map.get(pkg, 0) %} 送¥{{ gift_map[pkg] }}{% endif %}
+                </button>
+                {% endfor %}
+                </div></div>
+            <div class="col-md-6"><label class="form-label">充值金额 *</label><input type="number" name="amount" id="r_amount" class="form-control form-control-sm" required step="0.01"></div>
+            <div class="col-md-6"><label class="form-label">赠送金额</label><input type="number" name="gift_amount" id="r_gift" class="form-control form-control-sm" value="0" step="0.01"></div>
+            <div class="col-md-6"><label class="form-label">支付方式</label>
+                <select name="payment_method" class="form-select form-select-sm"><option>现金</option><option>微信</option><option>支付宝</option><option>银行卡</option></select></div>
+            <input type="hidden" name="package_name" id="r_pkg" value="">
+        </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-success btn-sm">确认充值</button></div>
+    </form>
+</div></div></div>
+
+<!-- 退款弹窗 -->
+<div class="modal fade" id="refundModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">充值退款</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('prepaid_refund') }}">
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-12"><label class="form-label">客户 *</label>
+                <select name="customer_id" id="rf_customer" class="form-select form-select-sm" required>
+                    <option value="">请选择</option>
+                    {% for c, a in rows %}<option value="{{ c.id }}">{{ c.name }} (余额:¥{{ "%.2f"|format(a.balance) }})</option>{% endfor %}
+                </select></div>
+            <div class="col-md-6"><label class="form-label">退款金额 *</label><input type="number" name="amount" class="form-control form-control-sm" required step="0.01"></div>
+            <div class="col-md-6"><label class="form-label">退款原因</label><input type="text" name="reason" class="form-control form-control-sm"></div>
+        </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('确认退款？')">确认退款</button></div>
+    </form>
+</div></div></div>
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.pkg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('r_amount').value = btn.dataset.amount;
+        document.getElementById('r_gift').value = btn.dataset.gift;
+        document.getElementById('r_pkg').value = btn.textContent.trim();
+    });
+});
+function setCustomer(id, name, type) {
+    if (type === 'recharge') {
+        document.getElementById('r_customer').value = id;
+        new bootstrap.Modal(document.getElementById('rechargeModal')).show();
+    } else {
+        document.getElementById('rf_customer').value = id;
+        new bootstrap.Modal(document.getElementById('refundModal')).show();
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block page_title %}批量入库{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> 返回库存</a>
+    <a href="{{ url_for('inbound_orders') }}" class="btn btn-sm btn-outline-info">入库单列表</a>
+</div>
+<div class="card mb-3"><div class="card-header">批量入库</div><div class="card-body">
+    <form method="POST" id="batchForm">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="items_json" id="itemsJson" value="[]">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6"><label class="form-label">供应商</label>
+                <input type="text" name="supplier" id="supplier" class="form-control form-control-sm" placeholder="供应商名称"></div>
+            <div class="col-md-6"><label class="form-label">备注</label>
+                <input type="text" name="remark" class="form-control form-control-sm"></div>
+        </div>
+        <div class="row g-2 mb-3 p-2 border rounded bg-light">
+            <div class="col-md-3"><label class="form-label">药品/耗材</label>
+                <select id="addMed" class="form-select form-select-sm">
+                    {% for m in medicines %}<option value="{{ m.id }}" data-name="{{ m.name }}">{{ m.name }} (库存:{{ stock_map.get(m.id, 0) }})</option>{% endfor %}
+                </select></div>
+            <div class="col-md-2"><label class="form-label">数量</label>
+                <input type="number" id="addQty" class="form-control form-control-sm" min="1" value="1"></div>
+            <div class="col-md-2"><label class="form-label">采购单价</label>
+                <input type="number" id="addPrice" class="form-control form-control-sm" step="0.01" value="0"></div>
+            <div class="col-md-2"><label class="form-label">批次号</label>
+                <input type="text" id="addBatch" class="form-control form-control-sm"></div>
+            <div class="col-md-2"><label class="form-label">有效期</label>
+                <input type="date" id="addExpiry" class="form-control form-control-sm"></div>
+            <div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-success" onclick="addItem()"><i class="bi bi-plus"></i></button></div>
+        </div>
+        <div class="table-responsive"><table class="table table-sm table-hover mb-2">
+            <thead><tr><th>药品/耗材</th><th>数量</th><th>采购单价</th><th>小计</th><th>批次号</th><th>有效期</th><th></th></tr></thead>
+            <tbody id="itemsBody"></tbody>
+            <tfoot><tr class="fw-bold"><td colspan="3" class="text-end">合计:</td><td id="totalAmount">¥0.00</td><td colspan="3"></td></tr></tfoot>
+        </table></div>
+        <button type="submit" class="btn btn-success" onclick="return beforeSubmit()">确认入库</button>
+    </form>
+</div></div>
+<script>
+let items = [];
+const medSelect = document.getElementById('addMed');
+
+function addItem() {
+    const sel = document.getElementById('addMed');
+    const opt = sel.options[sel.selectedIndex];
+    const mid = sel.value, name = opt.dataset.name || opt.text.split(' (')[0];
+    const qty = parseInt(document.getElementById('addQty').value) || 1;
+    const price = parseFloat(document.getElementById('addPrice').value) || 0;
+    const batch = document.getElementById('addBatch').value;
+    const expiry = document.getElementById('addExpiry').value;
+    items.push({medicine_id: mid, name: name, quantity: qty, unit_price: price, batch_no: batch, expiry_date: expiry});
+    renderTable();
+}
+function removeItem(idx) { items.splice(idx, 1); renderTable(); }
+function renderTable() {
+    const body = document.getElementById('itemsBody');
+    let total = 0;
+    body.innerHTML = items.map((it, i) => {
+        const sub = (it.quantity * it.unit_price).toFixed(2);
+        total += it.quantity * it.unit_price;
+        return `<tr><td>${it.name}</td><td>${it.quantity}</td><td>¥${it.unit_price.toFixed(2)}</td><td>¥${sub}</td><td>${it.batch_no||'-'}</td><td>${it.expiry_date||'-'}</td><td><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="removeItem(${i})">移除</button></td></tr>`;
+    }).join('');
+    document.getElementById('totalAmount').textContent = '¥' + total.toFixed(2);
+}
+function beforeSubmit() {
+    if (items.length === 0) { alert('请至少添加一项入库商品'); return false; }
+    document.getElementById('itemsJson').value = JSON.stringify(items);
+    return confirm(`确认入库 ${items.length} 项商品？`);
+}
+</script>
+{% endblock %}

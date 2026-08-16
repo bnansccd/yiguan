@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}{{ site_title }}业务系统{% endblock %}</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<!-- 全局顶栏（横跨左右，标准展示栏） -->
+<header class="global-topbar">
+    <div class="topbar-left">
+        <button class="btn btn-sm btn-outline-secondary" id="sidebarToggle" title="展开/收起导航">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="site-title" title="可在 系统管理→系统配置 中修改系统名称">
+            <i class="bi bi-heart-pulse"></i> {{ site_title }}
+        </span>
+        <span class="nav-path" id="navPath"><i class="bi bi-signpost-2"></i> {% block page_title %}{% endblock %}</span>
+    </div>
+    <div class="topbar-right">
+        <span class="user-info"><i class="bi bi-person-circle"></i> {{ current_user.display_name }}
+            <small class="badge bg-secondary">{{ current_user.role }}</small></span>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right"></i> 退出</a>
+    </div>
+</header>
+
+<div class="d-flex" id="wrapper">
+    <!-- 侧边栏（分组可折叠，内容超出可上下滚动） -->
+    <div class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i> 工作台
+            </a>
+
+            <div class="nav-group" data-group="biz">
+                <div class="nav-group-header"><span><i class="bi bi-briefcase"></i> 业务管理</span><i class="bi bi-chevron-down group-arrow"></i></div>
+                <div class="nav-group-body">
+                    <a href="{{ url_for('customers') }}" class="nav-link {% if request.endpoint and 'customer' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-people"></i> 客户管理
+                    </a>
+                    <a href="{{ url_for('appointments') }}" class="nav-link {% if request.endpoint and 'appointment' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-calendar-check"></i> 预约管理
+                    </a>
+                    {% if board_token %}
+                    <a href="{{ url_for('board_schedule', token=board_token) }}" target="_blank" class="nav-link" title="在新窗口打开排班看板（可投屏展示）">
+                        <i class="bi bi-tv"></i> 排班看板 <i class="bi bi-box-arrow-up-right" style="font-size:0.7em"></i>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('registrations') }}" class="nav-link {% if request.endpoint and ('registration' in request.endpoint or 'medical' in request.endpoint or 'charge_register' in request.endpoint) %}active{% endif %}">
+                        <i class="bi bi-clipboard2-pulse"></i> 挂号接诊
+                    </a>
+                    <a href="{{ url_for('charges') }}" class="nav-link {% if request.endpoint and 'charges' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-receipt"></i> 收费记录
+                    </a>
+                    <a href="{{ url_for('prepaid') }}" class="nav-link {% if request.endpoint and 'prepaid' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-wallet2"></i> 预充值管理
+                    </a>
+                    <a href="{{ url_for('annual_cards') }}" class="nav-link {% if request.endpoint and 'annual_card' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-award"></i> 年卡管理
+                    </a>
+                </div>
+            </div>
+
+            <div class="nav-group" data-group="stock">
+                <div class="nav-group-header"><span><i class="bi bi-graph-up"></i> 库存与报表</span><i class="bi bi-chevron-down group-arrow"></i></div>
+                <div class="nav-group-body">
+                    <a href="{{ url_for('inventory') }}" class="nav-link {% if request.endpoint and 'inventory' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-box-seam"></i> 库存管理
+                    </a>
+                    <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint and 'report' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-bar-chart-line"></i> 经营报表
+                    </a>
+                </div>
+            </div>
+
+            {% if current_user.role == '管理员' or current_user.role == '库管' %}
+            <div class="nav-group" data-group="settings">
+                <div class="nav-group-header"><span><i class="bi bi-sliders"></i> 基础设置</span><i class="bi bi-chevron-down group-arrow"></i></div>
+                <div class="nav-group-body">
+                    {% if current_user.role == '管理员' %}
+                    <a href="{{ url_for('settings_employees') }}" class="nav-link {% if request.endpoint and 'settings_employees' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-person-badge"></i> 员工管理
+                    </a>
+                    <a href="{{ url_for('settings_items') }}" class="nav-link {% if request.endpoint and 'settings_items' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-list-check"></i> 理疗项目
+                    </a>
+                    <a href="{{ url_for('settings_annual_card_templates') }}" class="nav-link {% if request.endpoint and 'annual_card_template' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-award-fill"></i> 年卡模板
+                    </a>
+                    {% endif %}
+                    {% if current_user.role in ['管理员', '库管'] %}
+                    <a href="{{ url_for('settings_medicines') }}" class="nav-link {% if request.endpoint and 'settings_medicines' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-capsule"></i> 药品耗材
+                    </a>
+                    {% endif %}
+                    {% if current_user.role == '管理员' %}
+                    <a href="{{ url_for('system') }}" class="nav-link {% if request.endpoint and 'system' in request.endpoint %}active{% endif %}">
+                        <i class="bi bi-gear"></i> 系统管理
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </nav>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <div class="content-area">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script>
+// CSRF自动注入：为所有POST表单添加CSRF令牌
+(function(){
+    var csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (csrfToken) {
+        document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+            if (!form.querySelector('input[name="_csrf_token"]')) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = '_csrf_token';
+                input.value = csrfToken.getAttribute('content');
+                form.appendChild(input);
+            }
+        });
+    }
+})();
+
+{% if current_user.is_authenticated %}
+// ===== 顶栏功能路径：根据当前激活菜单自动生成"分组-功能"面包屑 =====
+(function(){
+    var pathEl = document.getElementById('navPath');
+    if (!pathEl) return;
+    var active = document.querySelector('.sidebar-nav .nav-link.active');
+    if (!active) return;
+    var pageName = active.textContent.replace(/\s+/g, ' ').trim();
+    var group = active.closest('.nav-group');
+    var groupName = group ? group.querySelector('.nav-group-header span').textContent.trim() : '';
+    pathEl.innerHTML = '<i class="bi bi-signpost-2"></i> ' +
+        (groupName ? groupName + ' - ' : '') + pageName;
+})();
+
+// ===== 侧边栏整体展开/收起（状态持久化） =====
+(function(){
+    var btn = document.getElementById('sidebarToggle');
+    if (!btn) return;
+    if (localStorage.getItem('sidebarCollapsed') === '1') document.body.classList.add('nav-collapsed');
+    btn.addEventListener('click', function(){
+        document.body.classList.toggle('nav-collapsed');
+        localStorage.setItem('sidebarCollapsed', document.body.classList.contains('nav-collapsed') ? '1' : '0');
+    });
+})();
+
+// ===== 导航分组折叠/展开（状态持久化，含激活项的分组强制展开） =====
+(function(){
+    document.querySelectorAll('.nav-group').forEach(function(group){
+        var key = 'navGroup_' + group.dataset.group;
+        var header = group.querySelector('.nav-group-header');
+        var hasActive = !!group.querySelector('.nav-link.active');
+        var collapsed = localStorage.getItem(key) === '1' && !hasActive;
+        if (collapsed) group.classList.add('collapsed');
+        header.addEventListener('click', function(){
+            group.classList.toggle('collapsed');
+            localStorage.setItem(key, group.classList.contains('collapsed') ? '1' : '0');
+        });
+    });
+})();
+
+// ===== 通用表格分页：行数>10的数据表自动挂载分页控件 =====
+// 支持自定义每页条数（记忆用户设置）、页码跳转、总数统计；弹窗内表格不参与
+(function(){
+    var MIN_ROWS = 10;
+    var size = parseInt(localStorage.getItem('tablePageSize') || '20', 10);
+    if (!(size >= 5)) size = 20;
+
+    function pageButtons(cur, total, onJump){
+        var wrap = document.createElement('span');
+        function btn(label, page, disabled, activeCls){
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn btn-sm btn-outline-secondary' + (activeCls ? ' ' + activeCls : '');
+            b.textContent = label;
+            b.disabled = !!disabled;
+            b.addEventListener('click', function(){ onJump(page); });
+            return b;
+        }
+        wrap.appendChild(btn('«', 1, cur <= 1));
+        wrap.appendChild(btn('‹', cur - 1, cur <= 1));
+        var start = Math.max(1, cur - 2), end = Math.min(total, start + 4);
+        start = Math.max(1, end - 4);
+        for (var i = start; i <= end; i++) {
+            wrap.appendChild(btn(String(i), i, false, i === cur ? 'active' : ''));
+        }
+        wrap.appendChild(btn('›', cur + 1, cur >= total));
+        wrap.appendChild(btn('»', total, cur >= total));
+        return wrap;
+    }
+
+    function mount(table){
+        var tbody = table.tBodies[0];
+        if (!tbody || table.closest('.modal') || table.classList.contains('no-pager')) return;
+        var rows = Array.prototype.slice.call(tbody.rows);
+        if (rows.length <= MIN_ROWS) return;
+
+        var page = 1, pageSize = size;
+        var bar = document.createElement('div');
+        bar.className = 'table-pager';
+        bar.innerHTML = '<span class="pager-info text-muted small"></span>' +
+            '<span class="pager-size small">每页 ' +
+            '<input type="number" class="form-control form-control-sm d-inline-block" ' +
+            'style="width:80px" min="5" max="500" step="5" value="' + pageSize + '"> 条</span>' +
+            '<span class="pager-nav"></span>';
+        table.parentNode.insertBefore(bar, table);
+        var info = bar.querySelector('.pager-info');
+        var nav = bar.querySelector('.pager-nav');
+        var sizeInput = bar.querySelector('input');
+
+        function render(){
+            var total = Math.max(1, Math.ceil(rows.length / pageSize));
+            if (page > total) page = total;
+            var startIdx = (page - 1) * pageSize;
+            rows.forEach(function(tr, i){
+                tr.style.display = (i >= startIdx && i < startIdx + pageSize) ? '' : 'none';
+            });
+            info.textContent = '共 ' + rows.length + ' 条记录，第 ' + page + '/' + total + ' 页';
+            nav.innerHTML = '';
+            nav.appendChild(pageButtons(page, total, function(p){ page = p; render(); }));
+        }
+        sizeInput.addEventListener('change', function(){
+            var v = parseInt(this.value, 10);
+            if (v >= 5) {
+                pageSize = Math.min(500, v);
+                this.value = pageSize;
+                localStorage.setItem('tablePageSize', String(pageSize));
+                page = 1; render();
+            } else { this.value = pageSize; }
+        });
+        render();
+    }
+
+    document.querySelectorAll('.content-area table.table').forEach(mount);
+})();
+{% endif %}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

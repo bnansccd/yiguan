@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block page_title %}客户详情 - {{ customer.name }}{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+    <div class="col-md-8">
+        <div class="card"><div class="card-header d-flex justify-content-between"><span>基本信息</span>
+            {% if current_user.role == '管理员' %}
+            <form method="POST" action="{{ url_for('customer_delete', cid=customer.id) }}" class="d-inline" onsubmit="return confirm('确定删除该客户？（软删除）')">
+                <button class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-trash"></i> 删除</button>
+            </form>
+            {% endif %}
+        </div><div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3"><strong>姓名：</strong>{{ customer.name }}</div>
+                <div class="col-md-3"><strong>性别：</strong>{{ customer.gender or '-' }}</div>
+                <div class="col-md-3"><strong>生日：</strong>{{ customer.birthday or '-' }}</div>
+                <div class="col-md-3"><strong>电话：</strong>{{ customer.phone or '-' }}</div>
+                <div class="col-md-3"><strong>身份证：</strong>{{ customer.id_card or '-' }}</div>
+                <div class="col-md-3"><strong>体质：</strong>{{ customer.constitution_type or '-' }}</div>
+                <div class="col-md-3"><strong>会员：</strong>{{ customer.member_level }} ({{ customer.member_discount }}折)</div>
+                <div class="col-md-3"><strong>积分：</strong>{{ customer.points }}</div>
+                <div class="col-md-6"><strong>过敏史：</strong>{{ customer.allergy_history or '无' }}</div>
+                <div class="col-md-6"><strong>既往病史：</strong>{{ customer.medical_history or '无' }}</div>
+            </div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-header">预充值账户</div><div class="card-body">
+            {% if account %}
+            <div class="text-center">
+                <h3 class="text-success">¥{{ "%.2f"|format(account.balance) }}</h3>
+                <div class="row text-center mt-2">
+                    <div class="col-4"><small class="text-muted">累计充值</small><br>¥{{ "%.2f"|format(account.total_recharge) }}</div>
+                    <div class="col-4"><small class="text-muted">累计消费</small><br>¥{{ "%.2f"|format(account.total_consumed) }}</div>
+                    <div class="col-4"><small class="text-muted">累计赠送</small><br>¥{{ "%.2f"|format(account.total_gift) }}</div>
+                </div>
+            </div>
+            {% else %}<div class="text-muted text-center">未开通预充值账户</div>{% endif %}
+        </div></div>
+    </div>
+</div>
+
+<!-- 就诊记录 -->
+<div class="card mb-3"><div class="card-header">就诊记录 (近20条)</div><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>挂号ID</th><th>时间</th><th>理疗师</th><th>类型</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for r in registrations %}
+    <tr>
+        <td>#{{ r.id }}</td>
+        <td>{{ r.reg_time.strftime('%Y-%m-%d %H:%M') if r.reg_time else '' }}</td>
+        <td>{{ r.employee.name if r.employee else '-' }}</td>
+        <td>{{ r.visit_type }}</td>
+        <td><span class="badge bg-{{ {'待诊':'warning','接诊中':'primary','已完成':'success'}[r.status] or 'secondary' }}">{{ r.status }}</span></td>
+        <td>
+            {% if r.status == '待诊' %}
+            <a href="{{ url_for('medical_record', rid=r.id) }}" class="btn btn-sm btn-outline-success py-0">接诊</a>
+            <a href="{{ url_for('charge_register', rid=r.id) }}" class="btn btn-sm btn-outline-primary py-0">收费</a>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not registrations %}<tr><td colspan="6" class="text-center text-muted py-3">暂无就诊记录</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+<!-- 病历记录 -->
+{% if medicals %}
+<div class="card mb-3"><div class="card-header">病历记录 (近10条)</div><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>病历ID</th><th>主诉</th><th>辨证分型</th><th>理疗方案</th><th>时间</th></tr></thead>
+    <tbody>
+    {% for mr in medicals %}
+    <tr>
+        <td>#{{ mr.id }}</td>
+        <td>{{ mr.chief_complaint|truncate(30) or '-' }}</td>
+        <td>{{ mr.syndrome|truncate(20) or '-' }}</td>
+        <td>{{ mr.treatment_plan|truncate(30) or '-' }}</td>
+        <td><small>{{ mr.created_at.strftime('%Y-%m-%d %H:%M') if mr.created_at else '' }}</small></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table></div></div></div>
+{% endif %}
+
+<!-- 充值记录 -->
+<div class="card mb-3"><div class="card-header">充值记录</div><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>充值ID</th><th>金额</th><th>赠送</th><th>支付方式</th><th>时间</th><th>操作人</th></tr></thead>
+    <tbody>
+    {% for r in recharges %}
+    <tr>
+        <td>#{{ r.id }}</td>
+        <td class="text-success fw-bold">¥{{ "%.2f"|format(r.amount) }}</td>
+        <td>¥{{ "%.2f"|format(r.gift_amount) }}</td>
+        <td>{{ r.payment_method }}</td>
+        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+        <td>{{ r.operator.display_name if r.operator else '-' }}</td>
+    </tr>
+    {% endfor %}
+    {% if not recharges %}<tr><td colspan="6" class="text-center text-muted py-3">暂无充值记录</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+<!-- 年卡信息 -->
+<div class="card mb-3"><div class="card-header d-flex justify-content-between">
+    <span>年卡信息</span>
+    <a href="{{ url_for('annual_cards') }}" class="btn btn-sm btn-outline-primary py-0">管理年卡</a>
+</div><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>年卡ID</th><th>年卡类型</th><th>购买日期</th><th>到期日期</th><th>剩余次数</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for card in annual_cards %}
+    <tr class="{{ 'table-warning' if card.status == '已冻结' else ('table-secondary' if card.status == '已过期' else '') }}">
+        <td>#{{ card.id }}</td>
+        <td>{{ card.template.name if card.template else '-' }}</td>
+        <td>{{ card.purchase_date }}</td>
+        <td>{{ card.expire_date }}</td>
+        <td>
+            {% set remaining = card.remaining_times_json | parse_json %}
+            {% if remaining %}
+                {% for sid, cnt in remaining.items() %}
+                    <span class="badge bg-info me-1">{{ cnt }}次</span>
+                {% endfor %}
+            {% else %}<span class="text-muted">-</span>{% endif %}
+        </td>
+        <td>
+            {% set colors = {'正常':'success','已冻结':'warning','已过期':'secondary'} %}
+            <span class="badge bg-{{ colors.get(card.status, 'light') }}">{{ card.status }}</span>
+        </td>
+        <td>
+            <a href="{{ url_for('annual_card_usage', card_id=card.id) }}" class="btn btn-sm btn-outline-info py-0">使用记录</a>
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not annual_cards %}<tr><td colspan="7" class="text-center text-muted py-3">暂无年卡</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+{% endblock %}

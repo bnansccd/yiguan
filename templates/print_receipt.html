@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>收费小票 - 挂号#{{ registration.id }}</title>
+    <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/print.css" rel="stylesheet">
+</head>
+<body>
+    <div class="print-toolbar no-print">
+        <h6 class="mb-3"><i class="bi bi-printer"></i> 收费小票打印预览</h6>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer"></i> 立即打印
+        </button>
+        <a href="/registrations" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> 返回挂号
+        </a>
+        <p class="text-muted small mt-2">将调用本机默认打印机（支持58mm/80mm热敏小票打印机）</p>
+    </div>
+
+    <div class="print-area">
+        <!-- 头部 -->
+        <div class="receipt-header">
+            <h5>{{ store.name if store else '昭德堂健康管理中心' }}</h5>
+            <div class="store-info">
+                {% if store %}{{ store.address }}<br>{{ store.phone }}{% endif %}
+            </div>
+            <div style="font-size:14px;font-weight:700;margin-top:6px">— 收 费 小 票 —</div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="receipt-body">
+            <div class="receipt-row">
+                <span class="label">小票编号:</span>
+                <span class="value">C{{ '%06d'|format(charge.id) }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">挂号编号:</span>
+                <span class="value">#{{ registration.id }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">客户姓名:</span>
+                <span class="value">{{ registration.customer.name }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">收费时间:</span>
+                <span class="value">{{ charge.created_at.strftime('%Y-%m-%d %H:%M') if charge.created_at else '-' }}</span>
+            </div>
+            <div class="receipt-row">
+                <span class="label">操作员:</span>
+                <span class="value">{{ charge.operator.display_name if charge.operator else '-' }}</span>
+            </div>
+
+            <div class="receipt-divider"></div>
+
+            <!-- 收费明细 -->
+            {% set items = charge.items_json|default('[]')|from_json %}
+            {% if items %}
+            <table class="receipt-table">
+                <thead><tr><th>项目</th><th class="text-right">数量</th><th class="text-right">金额</th></tr></thead>
+                <tbody>
+                {% for it in items %}
+                <tr><td>{{ it.name }}</td><td class="text-right">{{ it.qty }}</td><td class="text-right">¥{{ it.subtotal }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <div class="receipt-divider"></div>
+
+            <!-- 金额汇总 -->
+            <div class="receipt-row">
+                <span class="label">总计:</span>
+                <span class="value">¥{{ '%.2f'|format(charge.total_amount) }}</span>
+            </div>
+            {% if charge.discount_amount and charge.discount_amount > 0 %}
+            <div class="receipt-row">
+                <span class="label">优惠减免:</span>
+                <span class="value" style="color:#dc3545">-¥{{ '%.2f'|format(charge.discount_amount) }}</span>
+            </div>
+            {% endif %}
+            <div class="receipt-total">
+                <span>实付金额:</span>
+                <span>¥{{ '%.2f'|format(charge.final_amount) }}</span>
+            </div>
+
+            <!-- 支付明细 -->
+            {% set payments = charge.payments_json|default('[]')|from_json %}
+            {% if payments %}
+            <div class="receipt-divider"></div>
+            <div style="font-weight:700;font-size:12px;margin-bottom:4px">【支付方式】</div>
+            {% for p in payments %}
+            <div class="receipt-row">
+                <span class="label">{{ p.method }}:</span>
+                <span class="value">¥{{ '%.2f'|format(p.amount) }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- 底部 -->
+        <div class="receipt-footer">
+            <div>※ 请妥善保管此小票，作为消费凭证 ※</div>
+            <div style="margin-top:2px">如需退费请凭此票至前台办理</div>
+            <div style="margin-top:4px">{{ store.name if store else '昭德堂健康管理中心' }}</div>
+        </div>
+    </div>
+
+    <script>
+    window.addEventListener('load', function() {
+        setTimeout(function() { window.print(); }, 500);
+    });
+    </script>
+</body>
+</html>

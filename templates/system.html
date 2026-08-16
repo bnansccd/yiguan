@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block page_title %}系统管理{% endblock %}
+{% block content %}
+<div class="row g-3">
+    <!-- 门店信息 -->
+    <div class="col-md-6">
+        <div class="card mb-3"><div class="card-header">门店信息</div><div class="card-body">
+            <form method="POST" action="{{ url_for('system_store_update') }}"><div class="row g-2">
+                <div class="col-md-6"><label class="form-label">名称</label><input type="text" name="name" class="form-control form-control-sm" value="{{ store.name if store else '' }}"></div>
+                <div class="col-md-6"><label class="form-label">电话</label><input type="text" name="phone" class="form-control form-control-sm" value="{{ store.phone if store else '' }}"></div>
+                <div class="col-12"><label class="form-label">地址</label><input type="text" name="address" class="form-control form-control-sm" value="{{ store.address if store else '' }}"></div>
+                <div class="col-12"><label class="form-label">营业执照号</label><input type="text" name="license_no" class="form-control form-control-sm" value="{{ store.license_no if store else '' }}"></div>
+                <div class="col-12"><button type="submit" class="btn btn-sm btn-success">保存门店信息</button></div>
+            </div></form>
+        </div></div>
+    </div>
+    <!-- 用户管理 -->
+    <div class="col-md-6">
+        <div class="card mb-3"><div class="card-header d-flex justify-content-between"><span>用户管理</span>
+            <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addUserModal">添加用户</button></div>
+        <div class="card-body p-0"><table class="table table-sm mb-0">
+            <thead><tr><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th></th></tr></thead>
+            <tbody>{% for u in users %}<tr>
+                <td>{{ u.username }}</td><td>{{ u.display_name }}</td><td>{{ u.role }}</td>
+                <td><span class="badge bg-{{ 'success' if u.is_active_user else 'secondary' }}">{{ '启用' if u.is_active_user else '禁用' }}</span></td>
+                <td>
+                    <form method="POST" action="{{ url_for('system_user_toggle', uid=u.id) }}" class="d-inline">
+                        <button class="btn btn-sm btn-outline-{{ 'danger' if u.is_active_user else 'success' }} py-0">{{ '禁用' if u.is_active_user else '启用' }}</button></form>
+                    <button class="btn btn-sm btn-outline-info py-0" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">改密</button>
+                </td>
+            </tr>{% endfor %}</tbody>
+        </table></div></div>
+    </div>
+
+    <!-- 系统配置 -->
+    <div class="col-md-6">
+        <div class="card mb-3"><div class="card-header">系统配置</div><div class="card-body">
+            <form method="POST" action="{{ url_for('system_config_update') }}">
+            {% for cfg in configs %}
+            {% if cfg.key == 'time_slots' %}
+            <div class="mb-2">
+                <label class="form-label fw-bold"><i class="bi bi-clock"></i> 预约时段配置</label>
+                <div id="timeSlotsEditor" class="border rounded p-2 bg-light" style="max-height:200px;overflow-y:auto">
+                    {% for slot in (cfg.value or '').split(',') if slot.strip() %}
+                    <span class="badge bg-primary me-1 mb-1 p-2" style="font-size:0.85rem">
+                        {{ slot.strip() }}
+                        <button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5em" onclick="removeSlot(this, '{{ slot.strip() }}')"></button>
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="input-group input-group-sm mt-2">
+                    <input type="time" id="slotStart" class="form-control" style="width:100px">
+                    <span class="input-group-text">至</span>
+                    <input type="time" id="slotEnd" class="form-control" style="width:100px">
+                    <button type="button" class="btn btn-outline-success" onclick="addSlot()">添加时段</button>
+                </div>
+                <input type="hidden" name="cfg_time_slots" id="cfgTimeSlots" value="{{ cfg.value or '' }}">
+            </div>
+            {% else %}
+            <div class="mb-2"><label class="form-label">{{ cfg.description or cfg.key }}</label>
+                <input type="text" name="cfg_{{ cfg.key }}" class="form-control form-control-sm" value="{{ cfg.value }}"></div>
+            {% endif %}
+            {% endfor %}
+            <button type="submit" class="btn btn-sm btn-success mt-2">保存配置</button></form>
+        </div></div>
+    </div>
+<script>
+function _getSlots() {
+    const v = document.getElementById('cfgTimeSlots').value;
+    return v ? v.split(',').map(s=>s.trim()).filter(Boolean) : [];
+}
+function _renderSlots(slots) {
+    const editor = document.getElementById('timeSlotsEditor');
+    editor.innerHTML = slots.map(s =>
+        `<span class="badge bg-primary me-1 mb-1 p-2" style="font-size:0.85rem">${s}<button type="button" class="btn-close btn-close-white ms-1" style="font-size:0.5em" onclick="removeSlot(this,'${s}')"></button></span>`
+    ).join('') || '<span class="text-muted small">暂无时段，请添加</span>';
+    document.getElementById('cfgTimeSlots').value = slots.join(',');
+}
+function addSlot() {
+    const s = document.getElementById('slotStart').value, e = document.getElementById('slotEnd').value;
+    if (!s || !e) { alert('请选择开始和结束时间'); return; }
+    if (s >= e) { alert('结束时间必须大于开始时间'); return; }
+    const slot = s + '-' + e, slots = _getSlots();
+    if (slots.includes(slot)) { alert('该时段已存在'); return; }
+    slots.push(slot);
+    slots.sort();
+    _renderSlots(slots);
+    document.getElementById('slotStart').value = '';
+    document.getElementById('slotEnd').value = '';
+}
+function removeSlot(btn, slot) {
+    const slots = _getSlots().filter(s => s !== slot);
+    _renderSlots(slots);
+}
+</script>
+
+    <!-- 排班看板配置 -->
+    <div class="col-md-6">
+        <div class="card mb-3"><div class="card-header"><i class="bi bi-tv"></i> 排班看板配置</div><div class="card-body">
+            {% set board_token = configs|selectattr('key','equalto','board_token')|first %}
+            {% set board_theme = configs|selectattr('key','equalto','board_theme')|first %}
+            {% set board_view = configs|selectattr('key','equalto','board_view_mode')|first %}
+            {% set board_refresh = configs|selectattr('key','equalto','board_refresh_interval')|first %}
+            {% set board_mask = configs|selectattr('key','equalto','board_mask_customer_name')|first %}
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">访问令牌</label>
+                {% if board_token and board_token.value %}
+                <div class="input-group input-group-sm">
+                    <input type="text" id="boardTokenInput" class="form-control" value="{{ board_token.value }}" readonly>
+                    <button class="btn btn-outline-secondary" onclick="copyBoardLink()" title="复制链接"><i class="bi bi-clipboard"></i></button>
+                    <button class="btn btn-outline-info" onclick="openBoard()" title="打开看板"><i class="bi bi-box-arrow-up-right"></i></button>
+                </div>
+                <div class="mt-2 d-flex gap-2">
+                    <form method="POST" action="{{ url_for('system_board_token') }}" class="d-inline">
+                        <input type="hidden" name="action" value="generate">
+                        <button class="btn btn-sm btn-warning"><i class="bi bi-arrow-repeat"></i> 刷新令牌</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('system_board_token') }}" class="d-inline" onsubmit="return confirm('撤销后所有看板链接将失效，确定吗？')">
+                        <input type="hidden" name="action" value="revoke">
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-shield-x"></i> 撤销令牌</button>
+                    </form>
+                </div>
+                {% else %}
+                <form method="POST" action="{{ url_for('system_board_token') }}" class="d-inline">
+                    <input type="hidden" name="action" value="generate">
+                    <button class="btn btn-sm btn-success"><i class="bi bi-key"></i> 生成看板令牌</button>
+                </form>
+                <p class="text-muted small mt-1">生成令牌后即可获取看板独立访问链接，用于投屏展示</p>
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{{ url_for('system_config_update') }}">
+            <div class="mb-2">
+                <label class="form-label">默认主题</label>
+                <select name="cfg_board_theme" class="form-select form-select-sm">
+                    <option value="light" {% if not board_theme or board_theme.value == 'light' %}selected{% endif %}>亮色主题</option>
+                    <option value="dark" {% if board_theme and board_theme.value == 'dark' %}selected{% endif %}>暗色主题</option>
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">默认视图</label>
+                <select name="cfg_board_view_mode" class="form-select form-select-sm">
+                    <option value="timeline" {% if not board_view or board_view.value == 'timeline' %}selected{% endif %}>时间线</option>
+                    <option value="matrix" {% if board_view and board_view.value == 'matrix' %}selected{% endif %}>理疗师矩阵</option>
+                    <option value="list" {% if board_view and board_view.value == 'list' %}selected{% endif %}>列表视图</option>
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">自动刷新间隔(秒)</label>
+                <input type="number" name="cfg_board_refresh_interval" class="form-control form-control-sm"
+                       value="{{ board_refresh.value if board_refresh else '60' }}" min="10" max="600">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">客户姓名脱敏</label>
+                <select name="cfg_board_mask_customer_name" class="form-select form-select-sm">
+                    <option value="1" {% if not board_mask or board_mask.value == '1' %}selected{% endif %}>开启（张**）</option>
+                    <option value="0" {% if board_mask and board_mask.value == '0' %}selected{% endif %}>关闭（显示全名）</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success mt-2">保存看板配置</button>
+            </form>
+
+            {% if board_token and board_token.value %}
+            <hr>
+            <div class="small text-muted">
+                <strong>看板完整链接：</strong><br>
+                <code id="boardFullLink" class="user-select-all">{{ request.host_url }}board/schedule?token={{ board_token.value }}</code>
+            </div>
+            {% endif %}
+        </div></div>
+    </div>
+
+<script>
+function copyBoardLink() {
+    const link = document.getElementById('boardFullLink');
+    if (link) {
+        navigator.clipboard.writeText(link.textContent).then(() => {
+            alert('看板链接已复制到剪贴板');
+        }).catch(() => {
+            link.select(); document.execCommand('copy');
+            alert('看板链接已复制');
+        });
+    } else {
+        const input = document.getElementById('boardTokenInput');
+        if (input) {
+            const url = window.location.origin + '/board/schedule?token=' + input.value;
+            navigator.clipboard.writeText(url).then(() => alert('看板链接已复制'));
+        }
+    }
+}
+function openBoard() {
+    const input = document.getElementById('boardTokenInput');
+    if (input) {
+        const url = window.location.origin + '/board/schedule?token=' + input.value;
+        window.open(url, '_blank');
+    }
+}
+</script>
+
+    <!-- 数据管理 -->
+    <div class="col-md-6">
+        <div class="card mb-3"><div class="card-header">数据备份与恢复</div><div class="card-body">
+            <form method="POST" action="{{ url_for('system_backup') }}" class="mb-3 d-inline">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-download"></i> 立即备份</button>
+            </form>
+            <a href="{{ url_for('system_logs') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-journal-text"></i> 操作日志</a>
+            <hr>
+            <h6>备份文件列表</h6>
+            {% if backups %}
+            <div class="table-responsive" style="max-height:200px;overflow-y:auto">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>文件名</th><th>大小</th><th>时间</th><th>操作</th></tr></thead>
+                <tbody>
+                {% for b in backups[:10] %}
+                <tr>
+                    <td><small>{{ b.name }}</small></td>
+                    <td><small>{{ "%.1f"|format(b.size/1024) }}KB</small></td>
+                    <td><small>{{ b.time }}</small></td>
+                    <td>
+                        <form method="POST" action="{{ url_for('system_restore') }}" class="d-inline" onsubmit="return confirm('确定要从该备份恢复数据吗？恢复前会自动备份当前数据。')">
+                            <input type="hidden" name="backup_file" value="{{ b.name }}">
+                            <button class="btn btn-sm btn-outline-warning py-0">恢复</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <p class="text-muted mb-0">暂无备份文件</p>
+            {% endif %}
+        </div></div>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="col-12">
+        <div class="card"><div class="card-header">系统信息</div><div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3"><strong>系统版本:</strong> v{{ version }}</div>
+                <div class="col-md-3"><strong>数据库版本:</strong> v{{ db_version or '未记录' }}</div>
+                <div class="col-md-3"><strong>数据库:</strong> SQLite (WAL模式)</div>
+                <div class="col-md-3"><strong>自动备份:</strong> {{ '已启用' if configs|selectattr('key','equalto','auto_backup')|list|length > 0 else '未配置' }}</div>
+                <div class="col-md-3"><strong>备份目录:</strong> backups/</div>
+                {% if upgrade_report %}
+                <div class="col-md-6"><strong>本次启动升级检查:</strong>
+                    {% if upgrade_report.action == 'skipped' %}版本一致，无需升级
+                    {% elif upgrade_report.action == 'fresh_install' %}全新安装并初始化
+                    {% elif upgrade_report.action == 'legacy_adopt' %}遗留库首次纳管（已备份+补全）
+                    {% elif upgrade_report.action == 'upgraded' %}已升级至 v{{ upgrade_report.target_version }}（已备份+校验）
+                    {% else %}{{ upgrade_report.action }}{% endif %}
+                    {% if upgrade_report.post_integrity %}（完整性: {{ upgrade_report.post_integrity.integrity }}）{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div></div>
+    </div>
+</div>
+
+<!-- 添加用户弹窗 -->
+<div class="modal fade" id="addUserModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">添加用户</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('system_user_add') }}"><div class="modal-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label">用户名 *</label><input type="text" name="username" class="form-control form-control-sm" required></div>
+        <div class="col-md-6"><label class="form-label">显示名 *</label><input type="text" name="display_name" class="form-control form-control-sm" required></div>
+        <div class="col-md-6"><label class="form-label">角色</label><select name="role" class="form-select form-select-sm">
+            <option>前台</option><option>理疗师</option><option>库管</option><option>管理员</option></select></div>
+        <div class="col-md-6"><label class="form-label">密码</label><input type="password" name="password" class="form-control form-control-sm" value="123456"></div>
+    </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">创建</button></div></form>
+</div></div></div>
+
+<!-- 修改密码弹窗 (每个用户一个) -->
+{% for u in users %}
+<div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">修改密码 - {{ u.display_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('change_password', uid=u.id) }}"><div class="modal-body"><div class="row g-3">
+        {% if current_user.role != '管理员' or current_user.id == u.id %}
+        <div class="col-12"><label class="form-label">原密码</label><input type="password" name="old_password" class="form-control form-control-sm" required></div>
+        {% endif %}
+        <div class="col-12"><label class="form-label">新密码 *</label><input type="password" name="new_password" class="form-control form-control-sm" required minlength="6"></div>
+        <div class="col-12"><label class="form-label">确认密码 *</label><input type="password" name="confirm_password" class="form-control form-control-sm" required></div>
+    </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">确认修改</button></div></form>
+</div></div></div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block page_title %}收费记录{% endblock %}
+{% block content %}
+<form class="d-flex gap-2 mb-3" method="GET">
+    <input type="date" name="start" class="form-control form-control-sm" value="{{ start }}" style="width:150px">
+    <span class="align-self-center">至</span>
+    <input type="date" name="end" class="form-control form-control-sm" value="{{ end }}" style="width:150px">
+    <button class="btn btn-sm btn-outline-primary">查询</button>
+    <a href="{{ url_for('reports_export', start=start, end=end) }}" class="btn btn-sm btn-outline-success">导出CSV</a>
+</form>
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>单号</th><th>客户</th><th>总金额</th><th>折扣</th><th>实付</th><th>退款</th><th>状态</th><th>操作人</th><th>时间</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for c in records %}
+    <tr>
+        <td>#{{ c.id }}</td>
+        <td><a href="{{ url_for('customer_detail', cid=c.customer_id) }}">{{ c.customer.name }}</a></td>
+        <td>¥{{ "%.2f"|format(c.total_amount or 0) }}</td>
+        <td>¥{{ "%.2f"|format(c.discount_amount or 0) }}</td>
+        <td class="text-danger fw-bold">¥{{ "%.2f"|format(c.final_amount or 0) }}</td>
+        <td>{% if c.refund_amount %}<span class="text-warning">¥{{ "%.2f"|format(c.refund_amount) }}</span>{% else %}-{% endif %}</td>
+        <td><span class="badge bg-{{ 'success' if c.status=='已支付' else 'warning' if c.status=='待支付' else 'danger' }}">{{ c.status }}</span></td>
+        <td>{{ c.operator.display_name if c.operator else '-' }}</td>
+        <td><small>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}</small></td>
+        <td>
+            {% if c.status == '已支付' and current_user.role == '管理员' %}
+            <form method="POST" action="{{ url_for('charge_refund', charge_id=c.id) }}" class="d-inline" onsubmit="return confirm('确定退款？')">
+                <input type="hidden" name="refund_amount" value="{{ c.final_amount }}">
+                <input type="hidden" name="reason" value="管理员退款">
+                <button class="btn btn-sm btn-outline-danger py-0">退款</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not records %}<tr><td colspan="10" class="text-center text-muted py-3">暂无数据</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+{% if pagination and pagination.pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm justify-content-center">
+    {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="?start={{ start }}&end={{ end }}&page={{ pagination.prev_num }}">上一页</a></li>{% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}<li class="page-item {{ 'active' if p == pagination.page }}"><a class="page-link" href="?start={{ start }}&end={{ end }}&page={{ p }}">{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="?start={{ start }}&end={{ end }}&page={{ pagination.next_num }}">下一页</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}

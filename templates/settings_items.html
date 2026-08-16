@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block page_title %}理疗项目管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-circle"></i> 添加项目</button></div>
+<div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>ID</th><th>名称</th><th>分类</th><th>零售价</th><th>成本价</th><th>时长(分)</th><th>适用症</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>{% for i in items %}<tr>
+        <td>{{ i.id }}</td><td>{{ i.name }}</td><td>{{ i.category or '-' }}</td><td>¥{{ i.price }}</td><td>¥{{ i.cost_price or 0 }}</td><td>{{ i.duration or '-' }}</td>
+        <td><small>{{ i.indication or '-' }}</small></td>
+        <td><span class="badge bg-{{ 'success' if i.is_active else 'secondary' }}">{{ '启用' if i.is_active else '停用' }}</span></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#edit{{ i.id }}">编辑</button>
+            <form method="POST" class="d-inline"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="{{ i.id }}">
+                <button class="btn btn-sm btn-outline-{{ 'danger' if i.is_active else 'success' }} py-0">{{ '停用' if i.is_active else '启用' }}</button></form>
+            <form method="POST" class="d-inline" onsubmit="return confirm('确定删除项目 {{ i.name }}？')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ i.id }}">
+                <button class="btn btn-sm btn-outline-danger py-0">删除</button></form>
+        </td>
+    </tr>
+    <!-- 编辑弹窗 -->
+    <div class="modal fade" id="edit{{ i.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑项目 - {{ i.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST"><input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="{{ i.id }}"><div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">名称 *</label><input type="text" name="name" class="form-control form-control-sm" value="{{ i.name }}" required></div>
+            <div class="col-md-6"><label class="form-label">分类</label><select name="category" class="form-select form-select-sm">
+                {% for c in ['推拿','艾灸','拔罐','刮痧','针灸','正骨','其他'] %}<option {{ 'selected' if i.category == c else '' }}>{{ c }}</option>{% endfor %}</select></div>
+            <div class="col-md-4"><label class="form-label">零售价</label><input type="number" name="price" class="form-control form-control-sm" value="{{ i.price }}" step="0.01"></div>
+            <div class="col-md-4"><label class="form-label">成本价</label><input type="number" name="cost_price" class="form-control form-control-sm" value="{{ i.cost_price or 0 }}" step="0.01"></div>
+            <div class="col-md-4"><label class="form-label">时长(分钟)</label><input type="number" name="duration" class="form-control form-control-sm" value="{{ i.duration or '' }}"></div>
+            <div class="col-12"><label class="form-label">适用症</label><textarea name="indication" class="form-control form-control-sm" rows="2">{{ i.indication or '' }}</textarea></div>
+        </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+    </div></div></div>
+    {% endfor %}</tbody>
+</table></div></div></div>
+<div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">添加理疗项目</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST"><input type="hidden" name="action" value="add"><div class="modal-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label">名称 *</label><input type="text" name="name" class="form-control form-control-sm" required></div>
+        <div class="col-md-6"><label class="form-label">分类</label><select name="category" class="form-select form-select-sm">
+            {% for c in ['推拿','艾灸','拔罐','刮痧','针灸','正骨','其他'] %}<option>{{ c }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><label class="form-label">零售价</label><input type="number" name="price" class="form-control form-control-sm" step="0.01"></div>
+        <div class="col-md-4"><label class="form-label">成本价</label><input type="number" name="cost_price" class="form-control form-control-sm" step="0.01"></div>
+        <div class="col-md-4"><label class="form-label">时长(分钟)</label><input type="number" name="duration" class="form-control form-control-sm"></div>
+        <div class="col-12"><label class="form-label">适用症</label><textarea name="indication" class="form-control form-control-sm" rows="2"></textarea></div>
+    </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+</div></div></div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block page_title %}客户管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <form class="d-flex gap-2" method="GET">
+        <input type="text" name="keyword" class="form-control form-control-sm" placeholder="搜索姓名/手机/身份证" value="{{ keyword }}" style="width:250px">
+        <button class="btn btn-sm btn-outline-primary">搜索</button>
+    </form>
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-circle"></i> 新建客户</button>
+</div>
+
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover table-sm mb-0">
+    <thead><tr><th>ID</th><th>姓名</th><th>性别</th><th>电话</th><th>体质</th><th>会员等级</th><th>积分</th><th>状态</th><th>建档日期</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for c in customers %}
+    <tr class="{{ 'table-secondary' if c.is_frozen else '' }}">
+        <td>{{ c.id }}</td>
+        <td><a href="{{ url_for('customer_detail', cid=c.id) }}">{{ c.name }}</a></td>
+        <td>{{ c.gender or '-' }}</td>
+        <td>{{ c.phone or '-' }}</td>
+        <td>{{ c.constitution_type or '-' }}</td>
+        <td><span class="badge bg-{{ {'金卡':'warning','银卡':'secondary','钻石':'info','普通':'light'}[c.member_level] or 'light' }}">{{ c.member_level }}</span></td>
+        <td>{{ c.points }}</td>
+        <td>{% if c.is_frozen %}<span class="badge bg-danger">已冻结</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}</td>
+        <td><small>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '' }}</small></td>
+        <td>
+            <a href="{{ url_for('customer_detail', cid=c.id) }}" class="btn btn-sm btn-outline-info py-0">详情</a>
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#edit{{ c.id }}">编辑</button>
+            <form method="POST" action="{{ url_for('customer_freeze', cid=c.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-{{ 'success' if c.is_frozen else 'warning' }} py-0">{{ '解冻' if c.is_frozen else '冻结' }}</button></form>
+            <form method="POST" action="{{ url_for('customer_delete', cid=c.id) }}" class="d-inline" onsubmit="return confirm('确定删除客户 {{ c.name }}？')">
+                <button class="btn btn-sm btn-outline-danger py-0">删除</button></form>
+        </td>
+    </tr>
+    <!-- 编辑弹窗 -->
+    <div class="modal fade" id="edit{{ c.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑客户 - {{ c.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST" action="{{ url_for('customer_edit', cid=c.id) }}">
+        <div class="modal-body">
+            <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control form-control-sm" value="{{ c.name }}" required></div>
+                <div class="col-md-4"><label class="form-label">性别</label><select name="gender" class="form-select form-select-sm"><option value="男" {{ 'selected' if c.gender == '男' else '' }}>男</option><option value="女" {{ 'selected' if c.gender == '女' else '' }}>女</option></select></div>
+                <div class="col-md-4"><label class="form-label">出生日期</label><input type="date" name="birthday" class="form-control form-control-sm" value="{{ c.birthday or '' }}"></div>
+                <div class="col-md-4"><label class="form-label">手机号</label><input type="text" name="phone" class="form-control form-control-sm" value="{{ c.phone or '' }}"></div>
+                <div class="col-md-4"><label class="form-label">身份证号</label><input type="text" name="id_card" class="form-control form-control-sm" value="{{ c.id_card or '' }}"></div>
+                <div class="col-md-4"><label class="form-label">推荐人</label><input type="text" name="referrer" class="form-control form-control-sm" value="{{ c.referrer or '' }}"></div>
+                <div class="col-md-4"><label class="form-label">中医体质</label>
+                    <select name="constitution_type" class="form-select form-control-sm">
+                        <option value="">请选择</option>
+                        {% for t in ['平和质','气虚质','阳虚质','阴虚质','痰湿质','湿热质','血瘀质','气郁质','特禀质'] %}
+                        <option {{ 'selected' if c.constitution_type == t else '' }}>{{ t }}</option>{% endfor %}
+                    </select></div>
+                <div class="col-md-4"><label class="form-label">会员等级</label>
+                    <select name="member_level" class="form-select form-control-sm">
+                        {% for lv in ['普通','银卡','金卡','钻石'] %}<option value="{{ lv }}" {{ 'selected' if c.member_level == lv else '' }}>{{ lv }}</option>{% endfor %}
+                    </select></div>
+                <div class="col-md-4"><label class="form-label">折扣率</label><input type="number" name="member_discount" class="form-control form-control-sm" value="{{ c.member_discount or 1 }}" step="0.05" min="0.1" max="1.00"></div>
+                <div class="col-md-12"><label class="form-label">通讯地址</label><input type="text" name="address" class="form-control form-control-sm" value="{{ c.address or '' }}"></div>
+                <div class="col-md-6"><label class="form-label">过敏史</label><textarea name="allergy_history" class="form-control form-control-sm" rows="2">{{ c.allergy_history or '' }}</textarea></div>
+                <div class="col-md-6"><label class="form-label">既往病史</label><textarea name="medical_history" class="form-control form-control-sm" rows="2">{{ c.medical_history or '' }}</textarea></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-success btn-sm">保存</button></div>
+        </form>
+    </div></div></div>
+    {% endfor %}
+    {% if not customers %}<tr><td colspan="10" class="text-center text-muted py-3">暂无客户数据</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+{% if pagination and pagination.pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm justify-content-center">
+    {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="?keyword={{ keyword }}&page={{ pagination.prev_num }}">上一页</a></li>{% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}<li class="page-item {{ 'active' if p == pagination.page }}"><a class="page-link" href="?keyword={{ keyword }}&page={{ p }}">{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="?keyword={{ keyword }}&page={{ pagination.next_num }}">下一页</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+
+<!-- 新建客户弹窗 -->
+<div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">新建客户档案</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('customer_add') }}">
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-md-4"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control form-control-sm" required></div>
+            <div class="col-md-4"><label class="form-label">性别</label><select name="gender" class="form-select form-control-sm"><option value="男">男</option><option value="女">女</option></select></div>
+            <div class="col-md-4"><label class="form-label">出生日期</label><input type="date" name="birthday" class="form-control form-control-sm"></div>
+            <div class="col-md-4"><label class="form-label">手机号</label><input type="text" name="phone" class="form-control form-control-sm"></div>
+            <div class="col-md-4"><label class="form-label">身份证号</label><input type="text" name="id_card" class="form-control form-control-sm"></div>
+            <div class="col-md-4"><label class="form-label">推荐人</label><input type="text" name="referrer" class="form-control form-control-sm"></div>
+            <div class="col-md-4"><label class="form-label">中医体质</label>
+                <select name="constitution_type" class="form-select form-control-sm">
+                    <option value="">请选择</option>
+                    {% for t in ['平和质','气虚质','阳虚质','阴虚质','痰湿质','湿热质','血瘀质','气郁质','特禀质'] %}
+                    <option>{{ t }}</option>{% endfor %}
+                </select></div>
+            <div class="col-md-4"><label class="form-label">会员等级</label>
+                <select name="member_level" class="form-select form-control-sm">
+                    <option value="普通">普通</option><option value="银卡">银卡</option><option value="金卡">金卡</option><option value="钻石">钻石</option>
+                </select></div>
+            <div class="col-md-4"><label class="form-label">折扣率</label><input type="number" name="member_discount" class="form-control form-control-sm" value="1.00" step="0.05" min="0.1" max="1.00"></div>
+            <div class="col-md-12"><label class="form-label">通讯地址</label><input type="text" name="address" class="form-control form-control-sm"></div>
+            <div class="col-md-6"><label class="form-label">过敏史</label><textarea name="allergy_history" class="form-control form-control-sm" rows="2"></textarea></div>
+            <div class="col-md-6"><label class="form-label">既往病史</label><textarea name="medical_history" class="form-control form-control-sm" rows="2"></textarea></div>
+        </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-success btn-sm">保存</button></div>
+    </form>
+</div></div></div>
+{% endblock %}

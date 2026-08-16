@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block page_title %}药品耗材管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-circle"></i> 添加药品</button></div>
+<div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>ID</th><th>名称</th><th>分类</th><th>规格</th><th>单位</th><th>零售价</th><th>成本价</th><th>预警值</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>{% for m in medicines %}<tr>
+        <td>{{ m.id }}</td><td>{{ m.name }}</td><td>{{ m.category or '-' }}</td><td>{{ m.spec or '-' }}</td><td>{{ m.unit or '-' }}</td>
+        <td>¥{{ m.retail_price }}</td><td>¥{{ m.cost_price or 0 }}</td><td>{{ m.alert_threshold }}</td>
+        <td><span class="badge bg-{{ 'success' if m.is_active else 'secondary' }}">{{ '启用' if m.is_active else '停用' }}</span></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#edit{{ m.id }}">编辑</button>
+            <form method="POST" class="d-inline"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="{{ m.id }}">
+                <button class="btn btn-sm btn-outline-{{ 'danger' if m.is_active else 'success' }} py-0">{{ '停用' if m.is_active else '启用' }}</button></form>
+            <form method="POST" class="d-inline" onsubmit="return confirm('确定删除药品 {{ m.name }}？')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ m.id }}">
+                <button class="btn btn-sm btn-outline-danger py-0">删除</button></form>
+        </td>
+    </tr>
+    <!-- 编辑弹窗 -->
+    <div class="modal fade" id="edit{{ m.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑药品 - {{ m.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST"><input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="{{ m.id }}"><div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">名称 *</label><input type="text" name="name" class="form-control form-control-sm" value="{{ m.name }}" required></div>
+            <div class="col-md-6"><label class="form-label">分类</label><select name="category" class="form-select form-select-sm">
+                {% for c in ['中药饮片','中成药','耗材'] %}<option {{ 'selected' if m.category == c else '' }}>{{ c }}</option>{% endfor %}</select></div>
+            <div class="col-md-4"><label class="form-label">规格</label><input type="text" name="spec" class="form-control form-control-sm" value="{{ m.spec or '' }}"></div>
+            <div class="col-md-4"><label class="form-label">单位</label><input type="text" name="unit" class="form-control form-control-sm" value="{{ m.unit or '' }}" placeholder="g/ml/盒/瓶"></div>
+            <div class="col-md-4"><label class="form-label">预警阈值</label><input type="number" name="threshold" class="form-control form-control-sm" value="{{ m.alert_threshold }}"></div>
+            <div class="col-md-6"><label class="form-label">零售价</label><input type="number" name="price" class="form-control form-control-sm" value="{{ m.retail_price }}" step="0.01"></div>
+            <div class="col-md-6"><label class="form-label">成本价</label><input type="number" name="cost_price" class="form-control form-control-sm" value="{{ m.cost_price or 0 }}" step="0.01"></div>
+        </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+    </div></div></div>
+    {% endfor %}</tbody>
+</table></div></div></div>
+<div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">添加药品/耗材</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST"><input type="hidden" name="action" value="add"><div class="modal-body"><div class="row g-3">
+        <div class="col-md-4"><label class="form-label">名称 *</label><input type="text" name="name" class="form-control form-control-sm" required></div>
+        <div class="col-md-4"><label class="form-label">分类</label><select name="category" class="form-select form-select-sm"><option>中药饮片</option><option>中成药</option><option>耗材</option></select></div>
+        <div class="col-md-4"><label class="form-label">规格</label><input type="text" name="spec" class="form-control form-control-sm"></div>
+        <div class="col-md-4"><label class="form-label">单位</label><input type="text" name="unit" class="form-control form-control-sm" placeholder="g/ml/盒/瓶"></div>
+        <div class="col-md-4"><label class="form-label">零售价</label><input type="number" name="price" class="form-control form-control-sm" step="0.01"></div>
+        <div class="col-md-4"><label class="form-label">成本价</label><input type="number" name="cost_price" class="form-control form-control-sm" step="0.01"></div>
+        <div class="col-md-4"><label class="form-label">预警阈值</label><input type="number" name="threshold" class="form-control form-control-sm" value="10"></div>
+    </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+</div></div></div>
+{% endblock %}

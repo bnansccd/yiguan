@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block page_title %}收费结算 - 挂号#{{ registration.id }}{% endblock %}
+{% block content %}
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="card mb-3"><div class="card-header">收费明细</div><div class="card-body">
+            {% if medical %}
+            <h6>理疗项目</h6>
+            <table class="table table-sm"><thead><tr><th>项目</th><th>数量</th><th>单价</th><th>小计</th></tr></thead><tbody>
+            {% set items = medical.prescription_items_json|default('[]') %}
+            {% for it in items|from_json %}
+            <tr><td>{{ it.name }}</td><td>{{ it.qty }}</td><td>¥{{ it.price }}</td><td>¥{{ it.subtotal }}</td></tr>
+            {% endfor %}
+            </tbody></table>
+            <h6>药品</h6>
+            <table class="table table-sm"><thead><tr><th>药品</th><th>数量</th><th>单价</th><th>小计</th></tr></thead><tbody>
+            {% set meds = medical.prescription_meds_json|default('[]') %}
+            {% for m in meds|from_json %}
+            <tr><td>{{ m.name }}</td><td>{{ m.qty }}</td><td>¥{{ m.price }}</td><td>¥{{ m.subtotal }}</td></tr>
+            {% endfor %}
+            </tbody></table>
+            {% else %}
+            <p class="text-muted">尚未记录病历，请先<a href="{{ url_for('medical_record', rid=registration.id) }}">填写病历</a></p>
+            {% endif %}
+        </div></div>
+
+        <form method="POST" id="chargeForm">
+        <div class="card"><div class="card-header">支付结算</div><div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">总金额</label><input type="text" id="totalAmount" class="form-control form-control-sm" readonly></div>
+                <div class="col-md-4"><label class="form-label">折扣金额</label><input type="number" name="discount_amount" id="discountAmt" class="form-control form-control-sm" value="0" step="0.01" onchange="calcFinal()"></div>
+                <div class="col-md-4"><label class="form-label">实付金额</label><input type="text" id="finalAmount" class="form-control form-control-sm fw-bold text-danger" readonly></div>
+            </div>
+
+            {% if annual_cards %}
+            <hr>
+            <div class="alert alert-info py-2">
+                <strong><i class="bi bi-award"></i> 年卡抵扣</strong>
+                <p class="mb-1 small">该客户持有有效年卡，选择后自动抵扣对应项目次数，抵扣部分免收现金。</p>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <select class="form-select form-select-sm" id="annualCardSelect" onchange="applyAnnualCard()">
+                            <option value="">不使用年卡</option>
+                            {% for card in annual_cards %}
+                            <option value="{{ card.id }}"
+                                    data-remaining="{{ card.remaining_times_json }}"
+                                    data-name="{{ card.template.name if card.template else '-' }}">
+                                {{ card.template.name if card.template else '-' }}
+                                (到期: {{ card.expire_date }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <span id="cardDeductInfo" class="text-success fw-bold"></span>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" name="annual_card_id" id="annualCardId" value="">
+            {% endif %}
+
+            <hr>
+            <h6>支付方式</h6>
+            <div id="paymentMethods">
+                <div class="row g-2 mb-2 payment-row">
+                    <div class="col-md-4"><select class="form-select form-select-sm pay-method">
+                        <option value="现金">现金</option><option value="微信">微信</option><option value="支付宝">支付宝</option>
+                        <option value="预充值">预充值余额</option>
+                    </select></div>
+                    <div class="col-md-4"><input type="number" class="form-control form-control-sm pay-amount" step="0.01" placeholder="支付金额"></div>
+                    <div class="col-md-4"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.payment-row').remove()">删除</button></div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addPayment()">+ 添加支付方式</button>
+            <input type="hidden" name="items_json" id="itemsJson">
+            <input type="hidden" name="payments_json" id="paymentsJson">
+        </div></div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <a href="{{ url_for('registrations') }}" class="btn btn-secondary btn-sm">返回</a>
+            {% if registration.charge_record %}
+            <a href="{{ url_for('print_receipt', rid=registration.id) }}" target="_blank" class="btn btn-outline-info btn-sm"><i class="bi bi-printer"></i> 打印小票</a>
+            {% endif %}
+            <button type="submit" class="btn btn-success btn-sm" onclick="return submitCharge()"><i class="bi bi-check-circle"></i> 确认收费</button>
+        </div>
+        </form>
+    </div>
+    <div class="col-md-4">
+        <div class="card"><div class="card-header">客户信息</div><div class="card-body">
+            <p><strong>{{ registration.customer.name }}</strong> {{ registration.customer.gender }}</p>
+            <p>会员: {{ registration.customer.member_level }} ({{ registration.customer.member_discount }}折)</p>
+            {% if account %}
+            <hr>
+            <p>预充值余额: <strong class="text-success">¥{{ "%.2f"|format(account.balance) }}</strong></p>
+            {% endif %}
+            {% if annual_cards %}
+            <hr>
+            <p><i class="bi bi-award"></i> <strong>有效年卡</strong></p>
+            {% for card in annual_cards %}
+            <p class="small mb-1">
+                {{ card.template.name if card.template else '-' }}
+                <span class="badge bg-info">到期 {{ card.expire_date }}</span>
+            </p>
+            {% endfor %}
+            {% endif %}
+        </div></div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+const itemsData = {{ (medical.prescription_items_json|default('[]')|from_json)|tojson }};
+const medsData = {{ (medical.prescription_meds_json|default('[]')|from_json)|tojson }};
+const allItems = [...itemsData, ...medsData];
+const discount = parseFloat('{{ registration.customer.member_discount or 1 }}');
+let total = 0;
+allItems.forEach(it => { total += parseFloat(it.subtotal || 0); });
+const discountedTotal = (total * discount).toFixed(2);
+
+document.getElementById('totalAmount').value = '¥' + total.toFixed(2);
+document.getElementById('discountAmt').value = (total - parseFloat(discountedTotal)).toFixed(2);
+
+let cardDeductAmount = 0;
+calcFinal();
+
+function calcFinal() {
+    const disc = parseFloat(document.getElementById('discountAmt').value) || 0;
+    const final_ = Math.max(0, (total - disc - cardDeductAmount)).toFixed(2);
+    document.getElementById('finalAmount').value = '¥' + final_;
+    // Auto-fill first payment
+    const firstAmt = document.querySelector('.pay-amount');
+    if (firstAmt && !firstAmt.value) firstAmt.value = final_;
+}
+
+function applyAnnualCard() {
+    const sel = document.getElementById('annualCardSelect');
+    const cardIdInput = document.getElementById('annualCardId');
+    const infoSpan = document.getElementById('cardDeductInfo');
+    cardDeductAmount = 0;
+
+    if (!sel.value) {
+        cardIdInput.value = '';
+        infoSpan.textContent = '';
+        calcFinal();
+        return;
+    }
+
+    cardIdInput.value = sel.value;
+    const remaining = JSON.parse(sel.options[sel.selectedIndex].dataset.remaining || '{}');
+    const cardName = sel.options[sel.selectedIndex].dataset.name;
+
+    // 遍历项目，计算可抵扣金额
+    let deductTotal = 0;
+    let deductCount = 0;
+    allItems.forEach(it => {
+        const sid = String(it.service_item_id || '');
+        if (sid in remaining && remaining[sid] > 0) {
+            const times = Math.min(parseInt(it.qty || 1), remaining[sid]);
+            deductTotal += parseFloat(it.price || 0) * times;
+            deductCount += times;
+        }
+    });
+
+    cardDeductAmount = deductTotal;
+    if (deductCount > 0) {
+        infoSpan.textContent = `年卡「${cardName}」可抵扣${deductCount}次，减免¥${deductTotal.toFixed(2)}`;
+    } else {
+        infoSpan.textContent = '当前项目不在年卡范围内';
+    }
+    calcFinal();
+}
+
+function addPayment() {
+    const div = document.createElement('div');
+    div.className = 'row g-2 mb-2 payment-row';
+    div.innerHTML = `<div class="col-md-4"><select class="form-select form-select-sm pay-method">
+        <option value="现金">现金</option><option value="微信">微信</option><option value="支付宝">支付宝</option>
+        <option value="预充值">预充值余额</option></select></div>
+        <div class="col-md-4"><input type="number" class="form-control form-control-sm pay-amount" step="0.01" placeholder="支付金额"></div>
+        <div class="col-md-4"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.payment-row').remove()">删除</button></div>`;
+    document.getElementById('paymentMethods').appendChild(div);
+}
+
+function submitCharge() {
+    document.getElementById('itemsJson').value = JSON.stringify(allItems);
+    const final_ = Math.max(0, total - (parseFloat(document.getElementById('discountAmt').value) || 0) - cardDeductAmount);
+    const payments = [];
+    document.querySelectorAll('.payment-row').forEach(row => {
+        const method = row.querySelector('.pay-method').value;
+        const amount = parseFloat(row.querySelector('.pay-amount').value) || 0;
+        if (amount > 0) payments.push({method, amount});
+    });
+    const payTotal = payments.reduce((s, p) => s + p.amount, 0);
+    if (payTotal < final_ - 0.01) {
+        alert(`支付金额不足！应付¥${final_.toFixed(2)}，已付¥${payTotal.toFixed(2)}`);
+        return false;
+    }
+    document.getElementById('paymentsJson').value = JSON.stringify(payments);
+    return true;
+}
+</script>
+{% endblock %}
+{% endblock %}

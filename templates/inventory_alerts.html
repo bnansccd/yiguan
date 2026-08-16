@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block page_title %}库存预警{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>类型</th><th>药品/耗材</th><th>当前库存</th><th>批次</th><th>有效期</th></tr></thead>
+    <tbody>
+    {% for a in alerts %}
+    <tr class="{{ 'table-danger' if a.type == '低库存' else 'table-warning' }}">
+        <td><span class="badge bg-{{ 'danger' if a.type=='低库存' else 'warning' }}">{{ a.type }}</span></td>
+        <td>{{ a.medicine.name }}</td>
+        <td class="fw-bold">{{ a.stock }}</td>
+        <td>{{ a.batch or '-' }}</td>
+        <td>{{ a.expiry or '-' }}</td>
+    </tr>
+    {% endfor %}
+    {% if not alerts %}<tr><td colspan="5" class="text-center text-success py-3"><i class="bi bi-check-circle"></i> 暂无预警</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+{% endblock %}

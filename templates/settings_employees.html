@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block page_title %}员工管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-circle"></i> 添加员工</button></div>
+<div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>ID</th><th>姓名</th><th>电话</th><th>角色</th><th>入职日期</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>{% for e in employees %}<tr>
+        <td>{{ e.id }}</td><td>{{ e.name }}</td><td>{{ e.phone or '-' }}</td><td>{{ e.role }}</td>
+        <td>{{ e.hire_date or '-' }}</td>
+        <td><span class="badge bg-{{ 'success' if e.is_active else 'secondary' }}">{{ '在职' if e.is_active else '离职' }}</span></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#edit{{ e.id }}">编辑</button>
+            <form method="POST" class="d-inline"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="{{ e.id }}">
+                <button class="btn btn-sm btn-outline-{{ 'danger' if e.is_active else 'success' }} py-0">{{ '停用' if e.is_active else '启用' }}</button></form>
+            <form method="POST" class="d-inline" onsubmit="return confirm('确定删除员工 {{ e.name }}？')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ e.id }}">
+                <button class="btn btn-sm btn-outline-danger py-0">删除</button></form>
+        </td>
+    </tr>
+    <!-- 编辑弹窗 -->
+    <div class="modal fade" id="edit{{ e.id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑员工 - {{ e.name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST"><input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="{{ e.id }}"><div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control form-control-sm" value="{{ e.name }}" required></div>
+            <div class="col-md-6"><label class="form-label">电话</label><input type="text" name="phone" class="form-control form-control-sm" value="{{ e.phone or '' }}"></div>
+            <div class="col-md-6"><label class="form-label">角色</label><select name="role" class="form-select form-select-sm">
+                {% for r in ['理疗师','前台','库管'] %}<option {{ 'selected' if e.role == r else '' }}>{{ r }}</option>{% endfor %}</select></div>
+            <div class="col-md-6"><label class="form-label">入职日期</label><input type="date" name="hire_date" class="form-control form-control-sm" value="{{ e.hire_date or '' }}"></div>
+        </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+    </div></div></div>
+    {% endfor %}</tbody>
+</table></div></div></div>
+<div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">添加员工</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST"><input type="hidden" name="action" value="add"><div class="modal-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label">姓名 *</label><input type="text" name="name" class="form-control form-control-sm" required></div>
+        <div class="col-md-6"><label class="form-label">电话</label><input type="text" name="phone" class="form-control form-control-sm"></div>
+        <div class="col-md-6"><label class="form-label">角色</label><select name="role" class="form-select form-select-sm"><option>理疗师</option><option>前台</option><option>库管</option></select></div>
+        <div class="col-md-6"><label class="form-label">入职日期</label><input type="date" name="hire_date" class="form-control form-control-sm"></div>
+    </div></div><div class="modal-footer"><button type="submit" class="btn btn-success btn-sm">保存</button></div></form>
+</div></div></div>
+{% endblock %}

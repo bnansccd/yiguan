@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block page_title %}挂号接诊{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+    <span class="text-muted">今日挂号记录</span>
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-circle"></i> 现场挂号</button>
+</div>
+
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>挂号ID</th><th>时间</th><th>客户</th><th>电话</th><th>理疗师</th><th>类型</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for r in registrations %}
+    <tr>
+        <td>#{{ r.id }}</td>
+        <td>{{ r.reg_time.strftime('%H:%M') if r.reg_time else '' }}</td>
+        <td><a href="{{ url_for('customer_detail', cid=r.customer_id) }}">{{ r.customer.name }}</a></td>
+        <td>{{ r.customer.phone or '-' }}</td>
+        <td>{{ r.employee.name if r.employee else '-' }}</td>
+        <td>{{ r.visit_type }}</td>
+        <td><span class="badge bg-{{ {'待诊':'warning','接诊中':'primary','已收费':'info','已完成':'success'}[r.status] or 'secondary' }}">{{ r.status }}</span>
+            {% if r.status == '已完成' and r.satisfaction_rating %}<span class="badge bg-warning text-dark ms-1">{{ '⭐' * r.satisfaction_rating }}</span>{% endif %}
+        </td>
+        <td>
+            {% if r.status == '待诊' %}
+            <a href="{{ url_for('medical_record', rid=r.id) }}" class="btn btn-sm btn-outline-success py-0">接诊</a>
+            <a href="{{ url_for('charge_register', rid=r.id) }}" class="btn btn-sm btn-outline-primary py-0">收费</a>
+            {% elif r.status == '接诊中' %}
+            <a href="{{ url_for('medical_record', rid=r.id) }}" class="btn btn-sm btn-outline-info py-0">病历</a>
+            <a href="{{ url_for('charge_register', rid=r.id) }}" class="btn btn-sm btn-outline-primary py-0">收费</a>
+            <a href="{{ url_for('print_prescription', rid=r.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0" title="打印处方"><i class="bi bi-printer"></i></a>
+            {% elif r.status == '已收费' %}
+            <a href="{{ url_for('confirm_treatment', rid=r.id) }}" class="btn btn-sm btn-outline-success py-0"><i class="bi bi-pen"></i> 签字确认</a>
+            <a href="{{ url_for('print_receipt', rid=r.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0" title="打印小票"><i class="bi bi-printer"></i></a>
+            {% elif r.status == '已完成' %}
+            <a href="{{ url_for('print_receipt', rid=r.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0" title="打印小票"><i class="bi bi-printer"></i></a>
+            {% if r.signature_image %}<button class="btn btn-sm btn-outline-info py-0" data-sig="{{ r.signature_image }}" onclick="showSignature(this)" title="查看签字"><i class="bi bi-pen"></i></button>{% endif %}
+            {% else %}
+            <span class="text-muted">{{ r.status }}</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not registrations %}<tr><td colspan="8" class="text-center text-muted py-3">今日暂无挂号</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+
+<!-- 现场挂号弹窗 -->
+<div class="modal fade" id="addModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">现场挂号</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('registration_add') }}">
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-12"><label class="form-label">客户 *</label>
+                <select name="customer_id" class="form-select form-select-sm" required>
+                    <option value="">请选择</option>
+                    {% for c in customers %}<option value="{{ c.id }}">{{ c.name }} ({{ c.phone or '' }})</option>{% endfor %}
+                </select></div>
+            <div class="col-md-6"><label class="form-label">理疗师</label>
+                <select name="employee_id" class="form-select form-select-sm">
+                    <option value="">不指定</option>
+                    {% for e in employees %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+                </select></div>
+            <div class="col-md-6"><label class="form-label">就诊类型</label>
+                <select name="visit_type" class="form-select form-select-sm"><option>初诊</option><option>复诊</option></select></div>
+        </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-success btn-sm">挂号</button></div>
+    </form>
+</div></div></div>
+
+<!-- 签字查看弹窗 -->
+<div class="modal fade" id="sigModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">客户签字</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body text-center"><img id="sigImage" src="" style="max-width:100%;border:1px solid #ddd;border-radius:8px;padding:8px"></div>
+</div></div></div>
+<script>
+function showSignature(btn) {
+    document.getElementById('sigImage').src = btn.dataset.sig;
+    new bootstrap.Modal(document.getElementById('sigModal')).show();
+}
+</script>
+{% endblock %}

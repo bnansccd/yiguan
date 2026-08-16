@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block page_title %}出入库流水{% endblock %}
+{% block content %}
+<form class="d-flex gap-2 mb-3" method="GET">
+    <select name="medicine_id" class="form-select form-select-sm" style="width:200px" onchange="this.form.submit()">
+        <option value="">全部药品</option>
+        {% for m in medicines %}<option value="{{ m.id }}" {{ 'selected' if selected_mid == m.id else '' }}>{{ m.name }}</option>{% endfor %}
+    </select>
+</form>
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>流水ID</th><th>药品</th><th>类型</th><th>数量</th><th>单价</th><th>关联单号</th><th>操作人</th><th>备注</th><th>时间</th></tr></thead>
+    <tbody>
+    {% for f in flows %}
+    <tr class="{{ 'table-success' if f.flow_type=='入库' else 'table-warning' }}">
+        <td>{{ f.id }}</td><td>{{ f.medicine.name }}</td>
+        <td><span class="badge bg-{{ 'success' if f.flow_type=='入库' else 'warning' }}">{{ f.flow_type }}</span></td>
+        <td>{{ f.quantity }}</td><td>¥{{ f.unit_price }}</td>
+        <td>{{ f.ref_no or '-' }}</td><td>{{ f.operator.display_name if f.operator else '-' }}</td>
+        <td>{{ f.remark or '-' }}</td><td><small>{{ f.created_at.strftime('%Y-%m-%d %H:%M') if f.created_at else '' }}</small></td>
+    </tr>
+    {% endfor %}
+    {% if not flows %}<tr><td colspan="9" class="text-center text-muted py-3">暂无流水</td></tr>{% endif %}
+    </tbody>
+</table></div></div></div>
+{% endblock %}

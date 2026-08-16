@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block page_title %}年卡模板管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+        <i class="bi bi-plus-circle"></i> 新增模板
+    </button>
+</div>
+
+<!-- 模板列表 -->
+<div class="card"><div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-hover table-sm mb-0">
+    <thead><tr>
+        <th>ID</th><th>名称</th><th>售价</th><th>有效天数</th><th>额外折扣</th>
+        <th>包含项目及次数</th><th>状态</th><th>操作</th>
+    </tr></thead>
+    <tbody>
+    {% for t in templates %}
+    <tr class="{{ 'table-secondary' if not t.is_active else '' }}">
+        <td>{{ t.id }}</td>
+        <td>{{ t.name }}</td>
+        <td>¥{{ t.price }}</td>
+        <td>{{ t.valid_days }}天</td>
+        <td>{{ t.extra_discount or 1.00 }}</td>
+        <td>
+            {% set services = t.services_json | from_json %}
+            {% for svc in services %}
+                <span class="badge bg-info me-1">{{ svc.name }}: {{ svc.total_times }}次</span>
+            {% endfor %}
+            {% if not services %}<span class="text-muted">未配置</span>{% endif %}
+        </td>
+        <td>
+            {% if t.is_active %}
+            <span class="badge bg-success">启用</span>
+            {% else %}
+            <span class="badge bg-secondary">停用</span>
+            {% endif %}
+        </td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal"
+                    data-bs-target="#editTpl{{ t.id }}">编辑</button>
+            {% if t.is_active %}
+            <form method="POST" action="{{ url_for('settings_annual_card_template_delete', tid=t.id) }}" class="d-inline"
+                  onsubmit="return confirm('确定停用模板 {{ t.name }}？')">
+                <button class="btn btn-sm btn-outline-danger py-0">停用</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    <!-- 编辑弹窗 -->
+    <div class="modal fade" id="editTpl{{ t.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">编辑年卡模板 - {{ t.name }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form method="POST" action="{{ url_for('settings_annual_card_template_edit', tid=t.id) }}">
+        <div class="modal-body">
+            <div class="row g-3">
+                <div class="col-md-4"><label class="form-label">模板名称 *</label>
+                    <input type="text" name="name" class="form-control form-control-sm" value="{{ t.name }}" required></div>
+                <div class="col-md-4"><label class="form-label">售价(元) *</label>
+                    <input type="number" name="price" class="form-control form-control-sm" value="{{ t.price }}" step="0.01" required></div>
+                <div class="col-md-4"><label class="form-label">有效天数</label>
+                    <input type="number" name="valid_days" class="form-control form-control-sm" value="{{ t.valid_days or 365 }}"></div>
+                <div class="col-md-4"><label class="form-label">额外项目折扣</label>
+                    <input type="number" name="extra_discount" class="form-control form-control-sm"
+                           value="{{ t.extra_discount or 1.00 }}" step="0.05" min="0.1" max="1.00">
+                    <small class="text-muted">非包含项目享此折扣(0.5~1.0)</small>
+                </div>
+                <div class="col-md-4"><label class="form-label">启用状态</label>
+                    <select name="is_active" class="form-select form-select-sm">
+                        <option value="1" {{ 'selected' if t.is_active else '' }}>启用</option>
+                        <option value="0" {{ 'selected' if not t.is_active else '' }}>停用</option>
+                    </select>
+                </div>
+                <div class="col-12"><label class="form-label">说明</label>
+                    <textarea name="description" class="form-control form-control-sm" rows="2">{{ t.description or '' }}</textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">包含项目及次数</label>
+                    <div id="editServices{{ t.id }}">
+                        {% set services = t.services_json | from_json %}
+                        {% for svc in services %}
+                        <div class="row g-2 mb-2 svc-row">
+                            <div class="col-md-6">
+                                <select name="item_id[]" class="form-select form-select-sm">
+                                    <option value="">请选择项目</option>
+                                    {% for item in items %}
+                                    <option value="{{ item.id }}" {{ 'selected' if item.id == svc.service_item_id else '' }}>
+                                        {{ item.name }} (¥{{ item.price }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" name="item_times[]" class="form-control form-control-sm"
+                                       value="{{ svc.total_times }}" placeholder="次数">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.svc-row').remove()">删除</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                            onclick="addServiceRow('editServices{{ t.id }}')">+ 添加项目</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-success btn-sm">保存</button>
+        </div>
+        </form>
+    </div></div></div>
+    {% endfor %}
+    {% if not templates %}
+    <tr><td colspan="8" class="text-center text-muted py-3">暂无年卡模板</td></tr>
+    {% endif %}
+    </tbody>
+</table>
+</div></div></div>
+
+<!-- 新增模板弹窗 -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">新增年卡模板</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('settings_annual_card_template_add') }}">
+    <div class="modal-body">
+        <div class="row g-3">
+            <div class="col-md-4"><label class="form-label">模板名称 *</label>
+                <input type="text" name="name" class="form-control form-control-sm" required placeholder="如：全身推拿年卡"></div>
+            <div class="col-md-4"><label class="form-label">售价(元) *</label>
+                <input type="number" name="price" class="form-control form-control-sm" step="0.01" required></div>
+            <div class="col-md-4"><label class="form-label">有效天数</label>
+                <input type="number" name="valid_days" class="form-control form-control-sm" value="365"></div>
+            <div class="col-md-4"><label class="form-label">额外项目折扣</label>
+                <input type="number" name="extra_discount" class="form-control form-control-sm"
+                       value="1.00" step="0.05" min="0.1" max="1.00">
+                <small class="text-muted">非包含项目享此折扣</small>
+            </div>
+            <div class="col-12"><label class="form-label">说明</label>
+                <textarea name="description" class="form-control form-control-sm" rows="2"></textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label">包含项目及次数</label>
+                <div id="addServices"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                        onclick="addServiceRow('addServices')">+ 添加项目</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-success btn-sm">创建</button>
+    </div>
+    </form>
+</div></div></div>
+
+<script>
+function addServiceRow(containerId) {
+    const container = document.getElementById(containerId);
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 svc-row';
+    let optionsHtml = '<option value="">请选择项目</option>';
+    {% for item in items %}
+    optionsHtml += '<option value="{{ item.id }}">{{ item.name }} (¥{{ item.price }})</option>';
+    {% endfor %}
+    row.innerHTML = `
+        <div class="col-md-6">
+            <select name="item_id[]" class="form-select form-select-sm">${optionsHtml}</select>
+        </div>
+        <div class="col-md-4">
+            <input type="number" name="item_times[]" class="form-control form-control-sm" placeholder="次数" value="10">
+        </div>
+        <div class="col-md-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.svc-row').remove()">删除</button>
+        </div>`;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

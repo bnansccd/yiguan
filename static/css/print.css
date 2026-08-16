@@ -1,0 +1,110 @@
+/* 小票打印样式 - 适配58mm/80mm热敏打印机 */
+@media print {
+    /* 隐藏非打印内容 */
+    body * { visibility: hidden; }
+    .print-area, .print-area * { visibility: visible; }
+    .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+    .no-print { display: none !important; }
+
+    /* 页面设置 */
+    @page {
+        size: 80mm auto;
+        margin: 2mm;
+    }
+
+    body {
+        font-family: 'SimHei', 'Microsoft YaHei', monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #000;
+        background: #fff;
+    }
+}
+
+/* 屏幕预览 */
+.print-area {
+    max-width: 320px;
+    margin: 20px auto;
+    padding: 16px;
+    background: #fff;
+    border: 1px dashed #ccc;
+    font-family: 'SimHei', 'Microsoft YaHei', monospace;
+    font-size: 13px;
+}
+
+.receipt-header {
+    text-align: center;
+    border-bottom: 1px dashed #333;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+.receipt-header h5 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+.receipt-header .store-info {
+    font-size: 11px;
+    color: #666;
+}
+
+.receipt-body {
+    margin-bottom: 8px;
+}
+.receipt-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 12px;
+}
+.receipt-row .label { color: #666; }
+.receipt-row .value { font-weight: 600; }
+
+.receipt-divider {
+    border-top: 1px dashed #999;
+    margin: 6px 0;
+}
+
+.receipt-table {
+    width: 100%;
+    font-size: 11px;
+    border-collapse: collapse;
+}
+.receipt-table th {
+    text-align: left;
+    padding: 3px 0;
+    border-bottom: 1px solid #333;
+    font-size: 11px;
+}
+.receipt-table td {
+    padding: 2px 0;
+}
+.receipt-table .text-right { text-align: right; }
+
+.receipt-footer {
+    text-align: center;
+    border-top: 1px dashed #333;
+    padding-top: 8px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #666;
+}
+
+.receipt-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 0;
+}
+
+/* 打印按钮 */
+.print-toolbar {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+.print-toolbar .btn {
+    margin: 0 8px;
+}
